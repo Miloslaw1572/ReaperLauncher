@@ -1,6 +1,7 @@
 const { ipcRenderer } = require('electron');
+const os = require('os'); // Pobieranie info o komputerze
 
-// --- POBIERANIE ELEMENTÓW Z HTML ---
+// --- POBIERANIE ELEMENTÓW ---
 const btnEmptyAddAccount = document.getElementById('btnEmptyAddAccount');
 const accountSelectorContainer = document.getElementById('accountSelectorContainer');
 const customSelectToggle = document.getElementById('customSelectToggle');
@@ -14,10 +15,14 @@ const modalAddBtn = document.getElementById('modalAddBtn');
 const modalCancelBtn = document.getElementById('modalCancelBtn');
 const modalError = document.getElementById('modalError');
 
-// Elementy modala usuwania konta
 const deleteAccountModal = document.getElementById('deleteAccountModal');
 const modalDeleteConfirmBtn = document.getElementById('modalDeleteConfirmBtn');
 const modalDeleteCancelBtn = document.getElementById('modalDeleteCancelBtn');
+
+// Ustawienia
+const settingsModal = document.getElementById('settingsModal');
+const ramSlider = document.getElementById('ramSlider');
+const ramInput = document.getElementById('ramInput');
 
 const btnGraj = document.getElementById('playBtn');
 const poleStatusu = document.getElementById('status');
@@ -30,7 +35,52 @@ let accounts = JSON.parse(localStorage.getItem('reaper_accounts')) || [];
 let selectedAccount = localStorage.getItem('reaper_last_nick') || null;
 let runningInstances = 0;
 let isLaunching = false;
-let accountToDelete = null; // Przechowuje nick konta, które gracz chce właśnie usunąć
+let accountToDelete = null;
+
+// --- OBLICZANIE RAMU (50% komputera) ---
+const totalRAMBytes = os.totalmem();
+const totalRAMGB = totalRAMBytes / (1024 * 1024 * 1024);
+// Max RAM to 50% komputera (zaokrąglone w dół), ale minimum 2GB
+const maxRAMAllowed = Math.max(2, Math.floor(totalRAMGB / 2));
+
+ramSlider.max = maxRAMAllowed;
+ramInput.max = maxRAMAllowed;
+
+let currentRam = parseInt(localStorage.getItem('reaper_ram')) || 2;
+// Zabezpieczenie, gdyby gracz odpalił launchera na słabszym komputerze ze starym zapisem
+if (currentRam > maxRAMAllowed) currentRam = maxRAMAllowed;
+
+function syncRamDisplay(value) {
+    let num = parseInt(value);
+    if (isNaN(num) || num < 2) num = 2;
+    if (num > maxRAMAllowed) num = maxRAMAllowed;
+    ramSlider.value = num;
+    ramInput.value = num;
+}
+
+// --- TOP MENU ---
+document.getElementById('btnOpenMods').onclick = () => {
+    ipcRenderer.send('open-mods-folder');
+};
+
+document.getElementById('btnSettings').onclick = () => {
+    syncRamDisplay(localStorage.getItem('reaper_ram') || 2);
+    settingsModal.style.display = 'flex';
+};
+
+document.getElementById('modalSettingsCancelBtn').onclick = () => {
+    settingsModal.style.display = 'none';
+};
+
+document.getElementById('modalSettingsSaveBtn').onclick = () => {
+    syncRamDisplay(ramInput.value); // Weryfikacja
+    localStorage.setItem('reaper_ram', ramInput.value);
+    settingsModal.style.display = 'none';
+};
+
+ramSlider.oninput = (e) => syncRamDisplay(e.target.value);
+ramInput.onchange = (e) => syncRamDisplay(e.target.value);
+
 
 // --- RYSOWANIE INTERFEJSU KONT ---
 function renderAccounts() {
@@ -57,27 +107,27 @@ function renderAccounts() {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'dropdown-item';
 
-        const nameSpan = document.createElement('span');
-        nameSpan.innerText = acc;
-
-        nameSpan.onclick = (e) => {
+        // ZMIANA: Kliknięcie w dowolne miejsce pola wybiera konto
+        itemDiv.onclick = (e) => {
             e.stopPropagation();
             selectedAccount = acc;
             zamknijListeRozwijana();
             renderAccounts();
         };
 
+        const nameSpan = document.createElement('span');
+        nameSpan.innerText = acc;
+
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'btn-delete-acc';
         deleteBtn.innerText = '✖';
         deleteBtn.title = "Usuń to konto";
 
-        // Zamiast usuwać od razu, otwieramy okno potwierdzenia
         deleteBtn.onclick = (e) => {
-            e.stopPropagation();
-            accountToDelete = acc; // Zapisujemy w pamięci kogo usuwamy
-            deleteAccountModal.style.display = 'flex'; // Pokazujemy okienko
-            zamknijListeRozwijana(); // Zamykamy listę pod spodem, żeby nie przeszkadzała
+            e.stopPropagation(); // Blokuje kliknięcie z tła (nie wybiera konta)
+            accountToDelete = acc;
+            deleteAccountModal.style.display = 'flex';
+            zamknijListeRozwijana();
         };
 
         itemDiv.appendChild(nameSpan);
@@ -88,7 +138,6 @@ function renderAccounts() {
     aktualizujPrzyciskGraj();
 }
 
-// --- LOGIKA LISTY ROZWIJANEJ ---
 function zamknijListeRozwijana() {
     customDropdown.style.display = 'none';
     customSelectToggle.classList.remove('active');
@@ -106,15 +155,10 @@ customSelectToggle.onclick = (e) => {
     }
 };
 
-document.addEventListener('click', () => {
-    zamknijListeRozwijana();
-});
+document.addEventListener('click', () => { zamknijListeRozwijana(); });
+customDropdown.onclick = (e) => { e.stopPropagation(); }
 
-customDropdown.onclick = (e) => {
-    e.stopPropagation();
-}
-
-// --- LOGIKA OKIENKA DODAWANIA KONTA ---
+// --- LOGIKA MODALI KONT ---
 function otworzModal() {
     addAccountModal.style.display = 'flex';
     modalError.style.display = 'none';
@@ -122,9 +166,7 @@ function otworzModal() {
     modalNickInput.focus();
 }
 
-function zamknijModal() {
-    addAccountModal.style.display = 'none';
-}
+function zamknijModal() { addAccountModal.style.display = 'none'; }
 
 btnEmptyAddAccount.onclick = otworzModal;
 btnPlus.onclick = otworzModal;
@@ -132,45 +174,31 @@ modalCancelBtn.onclick = zamknijModal;
 
 modalAddBtn.onclick = () => {
     const nick = modalNickInput.value.trim();
-
-    if (nick.length < 3) {
-        modalError.innerText = "Nick musi mieć co najmniej 3 litery!";
-        modalError.style.display = 'block';
-        return;
-    }
-    if (accounts.includes(nick)) {
-        modalError.innerText = "To konto znajduje się już na liście!";
-        modalError.style.display = 'block';
-        return;
-    }
+    if (nick.length < 3) { modalError.innerText = "Nick musi mieć min. 3 litery!";
+        modalError.style.display = 'block'; return; }
+    if (accounts.includes(nick)) { modalError.innerText = "To konto już istnieje!";
+        modalError.style.display = 'block'; return; }
 
     accounts.push(nick);
     localStorage.setItem('reaper_accounts', JSON.stringify(accounts));
     selectedAccount = nick;
-
     zamknijModal();
     renderAccounts();
 };
 
-// --- LOGIKA OKIENKA USUWANIA KONTA ---
-// Klawisz "Nie"
 modalDeleteCancelBtn.onclick = () => {
     deleteAccountModal.style.display = 'none';
-    accountToDelete = null; // Resetujemy zapamiętane konto
+    accountToDelete = null;
 };
 
-// Klawisz "Tak"
 modalDeleteConfirmBtn.onclick = () => {
     if (accountToDelete) {
-        // Usuwamy z bazy
         accounts = accounts.filter(a => a !== accountToDelete);
         localStorage.setItem('reaper_accounts', JSON.stringify(accounts));
-
-        // Odświeżamy widok
         renderAccounts();
     }
     deleteAccountModal.style.display = 'none';
-    accountToDelete = null; // Reset
+    accountToDelete = null;
 };
 
 
@@ -207,15 +235,16 @@ btnGraj.addEventListener('click', () => {
     progressBar.value = 0;
     progressText.innerText = "0%";
 
-    ipcRenderer.send('start-game', selectedAccount);
+    // Przesyłamy Nick oraz zapisany RAM
+    const finalRam = localStorage.getItem('reaper_ram') || 2;
+    ipcRenderer.send('start-game', { username: selectedAccount, ram: finalRam });
 });
 
-// --- ODBIERANIE DANYCH Z MAIN.JS ---
+// --- ODBIERANIE DANYCH ---
 ipcRenderer.on('file-progress', (event, data) => {
     const pobrane = data.task;
     const wszystkie = data.total;
     const typ = data.type;
-
     if (wszystkie === 0) return;
 
     const procent = Math.round((pobrane / wszystkie) * 100);
@@ -233,7 +262,6 @@ ipcRenderer.on('game-started', () => {
     poleStatusu.style.color = "#2ecc71";
     poleStatusu.innerText = "Minecraft pomyślnie uruchomiony!";
     progressContainer.style.display = "none";
-
     isLaunching = false;
     runningInstances++;
     aktualizujPrzyciskGraj();
@@ -242,15 +270,9 @@ ipcRenderer.on('game-started', () => {
 ipcRenderer.on('game-closed', () => {
     runningInstances--;
     if (runningInstances < 0) runningInstances = 0;
-
     poleStatusu.style.color = "#ccc";
     poleStatusu.innerText = `Gra zamknięta. (Uruchomione: ${runningInstances}/2)`;
     aktualizujPrzyciskGraj();
 });
 
-document.getElementById('btnOpenMods').onclick = () => {
-    ipcRenderer.send('open-mods-folder');
-};
-
-// Inicjalizacja
 renderAccounts();

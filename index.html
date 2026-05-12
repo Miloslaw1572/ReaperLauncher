@@ -21,6 +21,68 @@
             align-items: center;
             justify-content: flex-start;
         }
+        /* --- GUZIKI W PRAWYM GÓRNYM ROGU --- */
+        
+        .top-right-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 15px;
+            /* Odstęp między guzikami */
+            z-index: 100;
+        }
+        
+        #btnOpenMods {
+            background-color: rgba(42, 42, 42, 0.8);
+            color: #f1c40f;
+            border: 1px solid #f1c40f;
+            padding: 0 15px;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            height: 40px;
+            /* Taka sama wysokość jak ikony */
+            display: flex;
+            align-items: center;
+        }
+        
+        #btnOpenMods:hover {
+            background-color: #f1c40f;
+            color: #000;
+        }
+        
+        #btnSettings {
+            background-color: rgba(42, 42, 42, 0.8);
+            border: 1px solid #f1c40f;
+            border-radius: 5px;
+            cursor: pointer;
+            height: 40px;
+            width: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+        }
+        
+        #btnSettings img {
+            width: 24px;
+            height: 24px;
+            /* Ten filtr sprawia, że szara ikona staje się zółta */
+            filter: invert(75%) sepia(50%) saturate(1000%) hue-rotate(360deg) brightness(100%) contrast(100%);
+            transition: 0.2s;
+        }
+        
+        #btnSettings:hover {
+            background-color: #f1c40f;
+        }
+        
+        #btnSettings:hover img {
+            filter: brightness(0);
+        }
+        /* Ikona staje się czarna po najechaniu */
         
         #mainLogo {
             width: 160px;
@@ -212,7 +274,8 @@
             margin-bottom: 20px;
         }
         
-        .modal-content input {
+        .modal-content input[type="text"],
+        .modal-content input[type="number"] {
             width: 90%;
             padding: 12px;
             margin-bottom: 15px;
@@ -258,7 +321,6 @@
         .btn-modal-add:hover {
             background-color: #2ecc71;
         }
-        /* Czerwony przycisk do usuwania */
         
         .btn-modal-delete {
             background-color: #c0392b;
@@ -274,6 +336,31 @@
             margin-bottom: 10px;
             display: none;
             font-weight: bold;
+        }
+        /* --- STYL SUWAKA RAM --- */
+        
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #f1c40f;
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #444;
+            border-radius: 2px;
         }
         /* --- RESZTA STYLÓW --- */
         
@@ -371,44 +458,18 @@
         .social-btn:hover img {
             filter: brightness(120%);
         }
-        
-        #btnTt img {
-            transform: scale(1.4);
-        }
-        
-        #btnWww img {
-            transform: scale(1.2);
-        }
-        /* Przycisk otwierania folderu modów */
-        
-        #btnOpenMods {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background-color: rgba(42, 42, 42, 0.8);
-            color: #f1c40f;
-            border: 1px solid #f1c40f;
-            padding: 8px 15px;
-            border-radius: 5px;
-            font-size: 12px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.2s;
-            z-index: 100;
-        }
-        
-        #btnOpenMods:hover {
-            background-color: #f1c40f;
-            color: #000;
-        }
     </style>
 </head>
 
 <body>
 
-    <img id="mainLogo" src="logo.png" alt="Logo">
+    <!-- NOWE MENU W PRAWYM GÓRNYM ROGU -->
+    <div class="top-right-controls">
+        <button id="btnOpenMods">Dodaj własne mody</button>
+        <button id="btnSettings" title="Ustawienia"><img src="icon_settings.png" alt="Opcje"></button>
+    </div>
 
-    <button id="btnOpenMods">Dodaj własne mody</button>
+    <img id="mainLogo" src="logo.png" alt="Logo">
 
     <div id="loginPanel">
         <h1>ReaperLauncher</h1>
@@ -443,7 +504,7 @@
         </div>
     </div>
 
-    <!-- OKIENKO MODALNE (Dodawanie konta) -->
+    <!-- OKIENKA MODALNE -->
     <div id="addAccountModal" class="modal-overlay">
         <div class="modal-content">
             <h3>Wprowadź nick</h3>
@@ -456,7 +517,6 @@
         </div>
     </div>
 
-    <!-- NOWE OKIENKO MODALNE (Potwierdzenie usunięcia konta) -->
     <div id="deleteAccountModal" class="modal-overlay">
         <div class="modal-content">
             <h3>Potwierdzenie</h3>
@@ -464,6 +524,24 @@
             <div class="modal-buttons">
                 <button id="modalDeleteCancelBtn" class="btn-modal btn-modal-cancel">Nie</button>
                 <button id="modalDeleteConfirmBtn" class="btn-modal btn-modal-delete">Tak</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOWE OKIENKO MODALNE (Ustawienia RAM) -->
+    <div id="settingsModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Ustawienia</h3>
+            <p style="color: #ccc; font-size: 13px; margin-bottom: 10px;">Przydział pamięci RAM (GB):</p>
+
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                <input type="range" id="ramSlider" min="2" max="8" step="1" style="flex-grow: 1;">
+                <input type="number" id="ramInput" min="2" max="8" style="width: 50px; margin-bottom: 0; padding: 8px;">
+            </div>
+
+            <div class="modal-buttons">
+                <button id="modalSettingsCancelBtn" class="btn-modal btn-modal-cancel">Anuluj</button>
+                <button id="modalSettingsSaveBtn" class="btn-modal btn-modal-add">Zapisz</button>
             </div>
         </div>
     </div>

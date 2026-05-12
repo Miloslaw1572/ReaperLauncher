@@ -4,11 +4,10 @@ const gracefulFs = require('graceful-fs');
 gracefulFs.gracefulify(realFs);
 // --------------------------------------------------
 
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { Client, Authenticator } = require('minecraft-launcher-core');
 const path = require('path');
 const fs = require('fs-extra');
-const { app, BrowserWindow, ipcMain, shell } = require('electron'); // Dodano shell
 
 let mainWindow;
 
@@ -31,11 +30,26 @@ function createWindow() {
 
 app.whenReady().then(createWindow);
 
-ipcMain.on('start-game', (event, username) => {
+// --- OTWIERANIE FOLDERU MODÓW ---
+ipcMain.on('open-mods-folder', () => {
+    const modsPath = path.join(app.getPath('appData'), '.reaperclient', 'mods');
 
-    // TWORZYMY NOWY, NIEZALEŻNY SILNIK DLA KAŻDEGO KLIKNIĘCIA "GRAJ"
+    // Zabezpieczenie: jeśli gracz kliknie guzik zanim gra się w ogóle zainstaluje, tworzymy strukturę na siłę!
+    if (!fs.existsSync(modsPath)) {
+        fs.mkdirSync(modsPath, { recursive: true });
+    }
+
+    shell.openPath(modsPath);
+});
+
+
+ipcMain.on('start-game', (event, data) => {
+
+    // ZMIANA: Teraz odbieramy "paczkę" danych (nick i ram)
+    const username = data.username;
+    const przydzielonyRam = data.ram;
+
     const launcher = new Client();
-
     const folderGry = path.join(app.getPath('appData'), '.reaperclient');
 
     // --- INTELIGENTNE KOPIOWANIE USTAWIEŃ GRACZA ---
@@ -43,9 +57,7 @@ ipcMain.on('start-game', (event, username) => {
     const plikOpcjiGracza = path.join(oryginalnyMinecraft, 'options.txt');
     const docelowyPlikOpcji = path.join(folderGry, 'options.txt');
 
-    // Jeśli gracz nie ma jeszcze opcji w ReaperClient...
     if (!fs.existsSync(docelowyPlikOpcji)) {
-        // ...ale ma je w zwykłym Minecrafcie
         if (fs.existsSync(plikOpcjiGracza)) {
             try {
                 fs.copySync(plikOpcjiGracza, docelowyPlikOpcji);
@@ -55,7 +67,6 @@ ipcMain.on('start-game', (event, username) => {
             }
         }
     }
-    // ----------------------------------------------
 
     // --- KOPIOWANIE DODATKOWYCH PLIKÓW ---
     const basepath = app.isPackaged ? process.resourcesPath : __dirname;
@@ -63,7 +74,6 @@ ipcMain.on('start-game', (event, username) => {
 
     try {
         if (fs.existsSync(sciezkaDodatkoweWProjekcie)) {
-            // Zabezpieczenie { overwrite: false } nie pozwoli zresetować zmian dokonanych przez gracza w przyszłości
             fs.copySync(sciezkaDodatkoweWProjekcie, folderGry, { overwrite: false });
             console.log("Dodatkowe pliki i konfiguracje zostały skopiowane.");
         } else {
@@ -76,13 +86,11 @@ ipcMain.on('start-game', (event, username) => {
     // --- WSTRZYKIWANIE DOMYŚLNYCH KEYBINDÓW Z MODÓW ---
     const plikOpcjiWGrze = path.join(folderGry, 'options.txt');
 
-    // Upewniamy się, że plik options.txt istnieje
     if (fs.existsSync(plikOpcjiWGrze)) {
         try {
             let opcjeTekst = fs.readFileSync(plikOpcjiWGrze, 'utf8');
             let czyZaktualizowano = false;
 
-            // Tutaj wpisujesz wszystkie klawisze modów, które chcesz wymusić u graczy
             const domyslneKlawisze = [
                 "key_Start/Stop Rollowanie:key.keyboard.apostrophe",
                 "key_Toggle Freelook:key.keyboard.left.alt"
@@ -92,9 +100,7 @@ ipcMain.on('start-game', (event, username) => {
                 const nazwaKlawisza = linijka.split(':')[0] + ':';
 
                 if (!opcjeTekst.includes(nazwaKlawisza)) {
-                    if (!opcjeTekst.endsWith('\n')) {
-                        opcjeTekst += '\n';
-                    }
+                    if (!opcjeTekst.endsWith('\n')) { opcjeTekst += '\n'; }
                     opcjeTekst += linijka + '\n';
                     czyZaktualizowano = true;
                 }
@@ -105,11 +111,8 @@ ipcMain.on('start-game', (event, username) => {
                 console.log("Wstrzyknięto brakujące keybindy z modów do options.txt!");
             }
 
-        } catch (err) {
-            console.error("Błąd podczas wstrzykiwania keybindów: ", err);
-        }
+        } catch (err) { console.error("Błąd podczas wstrzykiwania keybindów: ", err); }
     }
-    // --------------------------------------------------
 
     // --- OPCJE URUCHAMIANIA ---
     const sciezkaDoJavy = path.join(folderGry, 'java', 'bin', 'javaw.exe');
@@ -124,32 +127,28 @@ ipcMain.on('start-game', (event, username) => {
             custom: "fabric-loader-0.19.2-1.21.5"
         },
         memory: {
-            max: "4G",
+            max: `${przydzielonyRam}G`, // ZMIANA: Dynamiczny RAM z ustawień Frontendu!
             min: "2G"
         },
-        window: {
-            width: 854,
-            height: 480
-        },
+        window: { width: 854, height: 480 },
         detached: false
     };
 
     // --- CZARNA SKRZYNKA (LOGI DLA KAŻDEGO KONTA OSOBNO) ---
     const plikLogow = path.join(folderGry, `launcher_crash_log_${username}.txt`);
     const logStream = fs.createWriteStream(plikLogow, { flags: 'w' });
-    logStream.write(`=== ROZPOCZĘCIE URUCHAMIANIA KONTA: ${username} ===\n`);
+    logStream.write(`=== ROZPOCZĘCIE URUCHAMIANIA KONTA: ${username} | PRZYDZIELONY RAM: ${przydzielonyRam}GB ===\n`);
 
     launcher.on('data', (e) => logStream.write("[GRA]: " + e + "\n"));
     launcher.on('error', (e) => logStream.write("[BŁĄD KRYTYCZNY]: " + e + "\n"));
 
-    // --- NASŁUCHIWANIA DLA INTERFEJSU HTML ---
     launcher.on('progress', (e) => event.reply('file-progress', e));
     launcher.on('arguments', () => event.reply('game-started'));
 
     launcher.on('close', (code) => {
         logStream.write("[KOD WYJŚCIA]: " + code + "\n");
-        logStream.end(); // Zamykamy strumień logów bezpiecznie
-        event.reply('game-closed'); // Przekazujemy info do HTML, że gra się zamknęła
+        logStream.end();
+        event.reply('game-closed');
     });
 
     // --- START GRY ---
@@ -158,17 +157,4 @@ ipcMain.on('start-game', (event, username) => {
     } catch (err) {
         console.error(`Krytyczny błąd launchera dla konta ${username}:`, err);
     }
-
-
-    ipcMain.on('open-mods-folder', () => {
-        const modsPath = path.join(app.getPath('appData'), '.reaperclient', 'mods');
-
-        // Tworzymy folder, jeśli jakimś cudem gracz go usunął
-        if (!fs.existsSync(modsPath)) {
-            fs.ensureDirSync(modsPath);
-        }
-
-        shell.openPath(modsPath);
-    });
-
 });
