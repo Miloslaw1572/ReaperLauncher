@@ -1,0 +1,23 @@
+//waypoints config options
+usingMultiworldDetection:false
+ignoreServerLevelId:false
+defaultMultiworldId:mw0,-1,5
+teleportationEnabled:true
+usingDefaultTeleportCommand:true
+sortType:NONE
+sortReversed:false
+
+//other config options
+ignoreHeightmaps:false
+
+//dimension types (DO NOT EDIT)
+dimensionType:minecraft$dungeons_normal_0:minecraft$overworld
+dimensionType:minecraft$tutorial:minecraft$overworld
+dimensionType:minecraft$legendy:minecraft$overworld
+dimensionType:minecraft$mapa30:minecraft$overworld
+dimensionType:minecraft$mapa1:minecraft$overworld
+dimensionType:minecraft$overworld:minecraft$overworld
+dimensionType:minecraft$mapa0:minecraft$overworld
+dimensionType:minecraft$mapa15:minecraft$overworld
+dimensionType:minecraft$hub_expowiska:minecraft$overworld
+//server waypoints

@@ -1,0 +1,44 @@
+{
+    "name": "reaperlauncher",
+    "version": "1.0.0",
+    "description": "Najlepszy launcher do Minecrafta",
+    "main": "main.js",
+    "author": "ooliM",
+    "scripts": {
+        "start": "electron .",
+        "build": "electron-builder --win"
+    },
+    "build": {
+        "appId": "pl.reapercraft.launcher",
+        "productName": "ReaperLauncher",
+        "executableName": "ReaperClient",
+        "compression": "maximum",
+        "directories": {
+            "output": "GotowyLauncher"
+        },
+        "extraResources": [
+            "DodatkowePliki/**/*"
+        ],
+        "win": {
+            "target": "nsis",
+            "icon": "logo.png"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "ReaperClient",
+            "uninstallDisplayName": "ReaperLauncher (Odinstaluj)"
+        }
+    },
+    "dependencies": {
+        "fs-extra": "^11.3.5",
+        "graceful-fs": "^4.2.11",
+        "minecraft-launcher-core": "^3.18.2"
+    },
+    "devDependencies": {
+        "electron": "^41.5.1",
+        "electron-builder": "^26.8.1"
+    }
+}

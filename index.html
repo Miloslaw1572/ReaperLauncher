@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pl">
+
+<head>
+    <meta charset="UTF-8">
+    <title>ReaperLauncher</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-image: url('reaper_background.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        
+        #mainLogo {
+            width: 160px;
+            margin-top: 10vh;
+            margin-bottom: 25px;
+            filter: drop-shadow(0px 4px 10px rgba(0, 0, 0, 0.8));
+            z-index: 10;
+        }
+        
+        #loginPanel {
+            background-color: rgba(15, 15, 15, 0.85);
+            border: 2px solid #f1c40f;
+            padding: 40px;
+            border-radius: 10px;
+            width: 380px;
+            text-align: center;
+            box-shadow: 0px 0px 30px rgba(0, 0, 0, 0.9);
+        }
+        
+        h1 {
+            color: #f1c40f;
+            margin-top: 0;
+            font-size: 28px;
+        }
+        /* --- ZAAWANSOWANY SYSTEM KONT --- */
+        
+        .account-manager {
+            position: relative;
+            margin-bottom: 20px;
+            width: 90%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        #btnEmptyAddAccount {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            background-color: #f39c12;
+            color: white;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.2s;
+            display: none;
+        }
+        
+        #btnEmptyAddAccount:hover {
+            background-color: #e67e22;
+        }
+        
+        #accountSelectorContainer {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .custom-select {
+            flex-grow: 1;
+            background-color: #222;
+            border: 2px solid #333;
+            border-radius: 5px;
+            padding: 12px 15px;
+            color: white;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            user-select: none;
+        }
+        
+        .custom-select:hover,
+        .custom-select.active {
+            border-color: #f1c40f;
+        }
+        
+        .dropdown-arrow {
+            font-size: 12px;
+            color: #ccc;
+            transition: transform 0.2s;
+        }
+        
+        .custom-select.active .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+        
+        #btnPlus {
+            width: 45px;
+            height: 45px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+        }
+        
+        #btnPlus:hover {
+            background-color: #2ecc71;
+        }
+        
+        .custom-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: calc(100% - 55px);
+            background-color: #1a1a1a;
+            border: 2px solid #f1c40f;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            z-index: 50;
+            max-height: 150px;
+            overflow-y: auto;
+            display: none;
+            box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.8);
+        }
+        
+        .dropdown-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            color: white;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .dropdown-item:hover {
+            background-color: #333;
+        }
+        
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+        
+        .btn-delete-acc {
+            background: none;
+            border: none;
+            color: #e74c3c;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 3px;
+            transition: color 0.2s;
+        }
+        
+        .btn-delete-acc:hover {
+            color: #922b21;
+            background-color: transparent;
+        }
+        /* --- OKIENKA MODALNE --- */
+        
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        
+        .modal-content {
+            background-color: #1a1a1a;
+            border: 2px solid #f1c40f;
+            padding: 30px;
+            border-radius: 10px;
+            width: 300px;
+            text-align: center;
+            box-shadow: 0px 0px 20px rgba(0, 0, 0, 1);
+        }
+        
+        .modal-content h3 {
+            color: #f1c40f;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        
+        .modal-content input {
+            width: 90%;
+            padding: 12px;
+            margin-bottom: 15px;
+            background-color: #222;
+            border: 2px solid #444;
+            border-radius: 5px;
+            color: white;
+            text-align: center;
+        }
+        
+        .modal-content input:focus {
+            outline: none;
+            border-color: #f1c40f;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-modal {
+            flex: 1;
+            padding: 10px;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            color: white;
+        }
+        
+        .btn-modal-cancel {
+            background-color: #555;
+        }
+        
+        .btn-modal-cancel:hover {
+            background-color: #666;
+        }
+        
+        .btn-modal-add {
+            background-color: #27ae60;
+        }
+        
+        .btn-modal-add:hover {
+            background-color: #2ecc71;
+        }
+        /* Czerwony przycisk do usuwania */
+        
+        .btn-modal-delete {
+            background-color: #c0392b;
+        }
+        
+        .btn-modal-delete:hover {
+            background-color: #e74c3c;
+        }
+        
+        #modalError {
+            color: #e74c3c;
+            font-size: 12px;
+            margin-bottom: 10px;
+            display: none;
+            font-weight: bold;
+        }
+        /* --- RESZTA STYLÓW --- */
+        
+        #playBtn {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 18px;
+            background-color: #27ae60;
+            color: white;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        
+        #playBtn:hover {
+            background-color: #2ecc71;
+        }
+        
+        #playBtn:disabled {
+            background-color: #555 !important;
+            cursor: not-allowed;
+        }
+        
+        #status {
+            margin-top: 15px;
+            color: #ccc;
+            font-size: 14px;
+            min-height: 20px;
+            font-weight: bold;
+        }
+        
+        progress {
+            width: 100%;
+            height: 12px;
+            border-radius: 5px;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        
+        progress::-webkit-progress-bar {
+            background-color: #333;
+            border-radius: 5px;
+        }
+        
+        progress::-webkit-progress-value {
+            background-color: #f1c40f;
+            border-radius: 5px;
+        }
+        
+        #progressText {
+            margin-top: 5px;
+            font-size: 13px;
+            color: #f1c40f;
+            font-weight: bold;
+        }
+        
+        .social-links {
+            display: flex;
+            justify-content: center;
+            margin-top: 25px;
+            border-top: 1px solid #444;
+            padding-top: 20px;
+            gap: 15px;
+        }
+        
+        .social-btn {
+            background-color: #2a2a2a;
+            width: 50px;
+            height: 50px;
+            padding: 0;
+            border-radius: 8px;
+            border: 1px solid #444;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+            cursor: pointer;
+        }
+        
+        .social-btn img {
+            height: 24px;
+            width: auto;
+            max-width: 40px;
+            filter: none;
+            transition: 0.2s;
+        }
+        
+        .social-btn:hover {
+            border-color: #f1c40f;
+            background-color: #333;
+        }
+        
+        .social-btn:hover img {
+            filter: brightness(120%);
+        }
+        
+        #btnTt img {
+            transform: scale(1.4);
+        }
+        
+        #btnWww img {
+            transform: scale(1.2);
+        }
+    </style>
+</head>
+
+<body>
+
+    <img id="mainLogo" src="logo.png" alt="Logo">
+
+    <div id="loginPanel">
+        <h1>ReaperLauncher</h1>
+
+        <div class="account-manager">
+            <button id="btnEmptyAddAccount">Dodaj Konto</button>
+
+            <div id="accountSelectorContainer">
+                <div class="custom-select" id="customSelectToggle">
+                    <span id="selectedAccountName">Wybierz nick...</span>
+                    <span class="dropdown-arrow">▼</span>
+                </div>
+                <button id="btnPlus" title="Dodaj nowe konto">+</button>
+                <div id="customDropdown" class="custom-dropdown"></div>
+            </div>
+        </div>
+
+        <button id="playBtn">GRAJ</button>
+
+        <div id="progressContainer" style="display: none;">
+            <progress id="progressBar" value="0" max="100"></progress>
+            <p id="progressText">0%</p>
+        </div>
+
+        <p id="status">Gotowy do gry.</p>
+
+        <div class="social-links">
+            <button class="social-btn" id="btnWww" title="Strona WWW"><img src="icon_www.png" alt="WWW"></button>
+            <button class="social-btn" id="btnYt" title="YouTube"><img src="icon_yt.png" alt="YT"></button>
+            <button class="social-btn" id="btnTt" title="TikTok"><img src="icon_tt.png" alt="TT"></button>
+            <button class="social-btn" id="btnDc" title="Discord"><img src="icon_dc.png" alt="DC"></button>
+        </div>
+    </div>
+
+    <!-- OKIENKO MODALNE (Dodawanie konta) -->
+    <div id="addAccountModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Wprowadź nick</h3>
+            <p id="modalError">Błąd</p>
+            <input type="text" id="modalNickInput" placeholder="Twój nick" autocomplete="off">
+            <div class="modal-buttons">
+                <button id="modalCancelBtn" class="btn-modal btn-modal-cancel">Anuluj</button>
+                <button id="modalAddBtn" class="btn-modal btn-modal-add">Dodaj</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOWE OKIENKO MODALNE (Potwierdzenie usunięcia konta) -->
+    <div id="deleteAccountModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Potwierdzenie</h3>
+            <p style="color: white; margin-bottom: 25px;">Na pewno chcesz usunąć to konto?</p>
+            <div class="modal-buttons">
+                <button id="modalDeleteCancelBtn" class="btn-modal btn-modal-cancel">Nie</button>
+                <button id="modalDeleteConfirmBtn" class="btn-modal btn-modal-delete">Tak</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./renderer.js"></script>
+
+</body>
+
+</html>

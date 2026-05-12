@@ -1,0 +1,14 @@
+#
+#waypoint:name:initials:x:y:z:color:disabled:type:set:rotate_on_tp:tp_yaw:visibility_type:destination
+#
+waypoint:Boss-4:☠:-135:9:-56:12:false:0:gui.xaero_default:false:0:0:false
+waypoint:Boss-3:☠:-168:9:90:12:false:0:gui.xaero_default:false:0:0:false
+waypoint:Boss-2:☠:196:9:-3:12:false:0:gui.xaero_default:false:0:0:false
+waypoint:Boss-1:☠:280:8:-150:12:false:0:gui.xaero_default:false:0:0:false
+waypoint:Kamień-7:🪨:-84:9:-91:10:false:0:gui.xaero_default:false:0:0:false
+waypoint:Kamień-6:🪨:-151:8:172:10:false:0:gui.xaero_default:false:0:0:false
+waypoint:Kamień-5:🪨:-144:10:35:10:false:0:gui.xaero_default:false:0:0:false
+waypoint:Kamień-4:🪨:166:9:42:10:false:0:gui.xaero_default:false:0:0:false
+waypoint:Kamień-3:🪨:184:8:-63:10:false:0:gui.xaero_default:false:0:0:false
+waypoint:Kamień-2:🪨:309:8:-76:10:false:0:gui.xaero_default:false:0:0:false
+waypoint:Kamień-1:🪨:174:8:-253:10:false:0:gui.xaero_default:false:0:0:false
