@@ -379,12 +379,36 @@
         #btnWww img {
             transform: scale(1.2);
         }
+        /* Przycisk otwierania folderu modów */
+        
+        #btnOpenMods {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(42, 42, 42, 0.8);
+            color: #f1c40f;
+            border: 1px solid #f1c40f;
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            z-index: 100;
+        }
+        
+        #btnOpenMods:hover {
+            background-color: #f1c40f;
+            color: #000;
+        }
     </style>
 </head>
 
 <body>
 
     <img id="mainLogo" src="logo.png" alt="Logo">
+
+    <button id="btnOpenMods">Dodaj własne mody</button>
 
     <div id="loginPanel">
         <h1>ReaperLauncher</h1>

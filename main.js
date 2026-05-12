@@ -8,6 +8,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const { Client, Authenticator } = require('minecraft-launcher-core');
 const path = require('path');
 const fs = require('fs-extra');
+const { app, BrowserWindow, ipcMain, shell } = require('electron'); // Dodano shell
 
 let mainWindow;
 
@@ -157,4 +158,17 @@ ipcMain.on('start-game', (event, username) => {
     } catch (err) {
         console.error(`Krytyczny błąd launchera dla konta ${username}:`, err);
     }
+
+
+    ipcMain.on('open-mods-folder', () => {
+        const modsPath = path.join(app.getPath('appData'), '.reaperclient', 'mods');
+
+        // Tworzymy folder, jeśli jakimś cudem gracz go usunął
+        if (!fs.existsSync(modsPath)) {
+            fs.ensureDirSync(modsPath);
+        }
+
+        shell.openPath(modsPath);
+    });
+
 });

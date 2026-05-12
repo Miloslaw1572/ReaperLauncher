@@ -248,5 +248,9 @@ ipcRenderer.on('game-closed', () => {
     aktualizujPrzyciskGraj();
 });
 
+document.getElementById('btnOpenMods').onclick = () => {
+    ipcRenderer.send('open-mods-folder');
+};
+
 // Inicjalizacja
 renderAccounts();
