@@ -86,7 +86,7 @@
         
         #mainLogo {
             width: 160px;
-            margin-top: 10vh;
+            margin-top: 2vh;
             margin-bottom: 25px;
             filter: drop-shadow(0px 4px 10px rgba(0, 0, 0, 0.8));
             z-index: 10;
@@ -458,6 +458,10 @@
         .social-btn:hover img {
             filter: brightness(120%);
         }
+        
+        #btnTt img {
+            transform: scale(1.4);
+        }
     </style>
 </head>
 
@@ -531,7 +535,8 @@
     <!-- NOWE OKIENKO MODALNE (Ustawienia RAM) -->
     <div id="settingsModal" class="modal-overlay">
         <div class="modal-content">
-            <h3>Ustawienia</h3>
+            <!-- DODANO TUTAJ SPAN Z NICKIEM -->
+            <h3>Ustawienia: <span id="settingsAccountLabel" style="color: #fff;"></span></h3>
             <p style="color: #ccc; font-size: 13px; margin-bottom: 10px;">Przydział pamięci RAM (GB):</p>
 
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">

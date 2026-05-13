@@ -1,5 +1,5 @@
 const { ipcRenderer } = require('electron');
-const os = require('os'); // Pobieranie info o komputerze
+const os = require('os');
 
 // --- POBIERANIE ELEMENTÓW ---
 const btnEmptyAddAccount = document.getElementById('btnEmptyAddAccount');
@@ -19,8 +19,8 @@ const deleteAccountModal = document.getElementById('deleteAccountModal');
 const modalDeleteConfirmBtn = document.getElementById('modalDeleteConfirmBtn');
 const modalDeleteCancelBtn = document.getElementById('modalDeleteCancelBtn');
 
-// Ustawienia
 const settingsModal = document.getElementById('settingsModal');
+const settingsAccountLabel = document.getElementById('settingsAccountLabel');
 const ramSlider = document.getElementById('ramSlider');
 const ramInput = document.getElementById('ramInput');
 
@@ -33,6 +33,8 @@ const progressText = document.getElementById('progressText');
 // --- ZMIENNE STANOWE ---
 let accounts = JSON.parse(localStorage.getItem('reaper_accounts')) || [];
 let selectedAccount = localStorage.getItem('reaper_last_nick') || null;
+// ZMIANA: Zamiast jednej wartości, trzymamy obiekt z profilami RAM
+let ramProfiles = JSON.parse(localStorage.getItem('reaper_ram_profiles')) || {};
 let runningInstances = 0;
 let isLaunching = false;
 let accountToDelete = null;
@@ -40,15 +42,10 @@ let accountToDelete = null;
 // --- OBLICZANIE RAMU (50% komputera) ---
 const totalRAMBytes = os.totalmem();
 const totalRAMGB = totalRAMBytes / (1024 * 1024 * 1024);
-// Max RAM to 50% komputera (zaokrąglone w dół), ale minimum 2GB
 const maxRAMAllowed = Math.max(2, Math.floor(totalRAMGB / 2));
 
 ramSlider.max = maxRAMAllowed;
 ramInput.max = maxRAMAllowed;
-
-let currentRam = parseInt(localStorage.getItem('reaper_ram')) || 2;
-// Zabezpieczenie, gdyby gracz odpalił launchera na słabszym komputerze ze starym zapisem
-if (currentRam > maxRAMAllowed) currentRam = maxRAMAllowed;
 
 function syncRamDisplay(value) {
     let num = parseInt(value);
@@ -64,7 +61,15 @@ document.getElementById('btnOpenMods').onclick = () => {
 };
 
 document.getElementById('btnSettings').onclick = () => {
-    syncRamDisplay(localStorage.getItem('reaper_ram') || 2);
+    if (!selectedAccount) {
+        poleStatusu.innerText = "Najpierw dodaj lub wybierz konto!";
+        poleStatusu.style.color = "#ff4c4c";
+        return;
+    }
+    // Pobieramy RAM dla TEGO konkretnego konta
+    let ramForSelected = ramProfiles[selectedAccount] || 2;
+    settingsAccountLabel.innerText = selectedAccount;
+    syncRamDisplay(ramForSelected);
     settingsModal.style.display = 'flex';
 };
 
@@ -73,9 +78,13 @@ document.getElementById('modalSettingsCancelBtn').onclick = () => {
 };
 
 document.getElementById('modalSettingsSaveBtn').onclick = () => {
-    syncRamDisplay(ramInput.value); // Weryfikacja
-    localStorage.setItem('reaper_ram', ramInput.value);
+    syncRamDisplay(ramInput.value);
+    // Zapisujemy RAM dla TEGO konkretnego konta
+    ramProfiles[selectedAccount] = parseInt(ramInput.value);
+    localStorage.setItem('reaper_ram_profiles', JSON.stringify(ramProfiles));
     settingsModal.style.display = 'none';
+    poleStatusu.innerText = `Zapisano ustawienia dla profilu: ${selectedAccount}`;
+    poleStatusu.style.color = "#2ecc71";
 };
 
 ramSlider.oninput = (e) => syncRamDisplay(e.target.value);
@@ -107,7 +116,6 @@ function renderAccounts() {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'dropdown-item';
 
-        // ZMIANA: Kliknięcie w dowolne miejsce pola wybiera konto
         itemDiv.onclick = (e) => {
             e.stopPropagation();
             selectedAccount = acc;
@@ -124,7 +132,7 @@ function renderAccounts() {
         deleteBtn.title = "Usuń to konto";
 
         deleteBtn.onclick = (e) => {
-            e.stopPropagation(); // Blokuje kliknięcie z tła (nie wybiera konta)
+            e.stopPropagation();
             accountToDelete = acc;
             deleteAccountModal.style.display = 'flex';
             zamknijListeRozwijana();
@@ -195,6 +203,11 @@ modalDeleteConfirmBtn.onclick = () => {
     if (accountToDelete) {
         accounts = accounts.filter(a => a !== accountToDelete);
         localStorage.setItem('reaper_accounts', JSON.stringify(accounts));
+
+        // Czyścimy też przypisany mu RAM, żeby nie zaśmiecać dysku
+        delete ramProfiles[accountToDelete];
+        localStorage.setItem('reaper_ram_profiles', JSON.stringify(ramProfiles));
+
         renderAccounts();
     }
     deleteAccountModal.style.display = 'none';
@@ -235,8 +248,8 @@ btnGraj.addEventListener('click', () => {
     progressBar.value = 0;
     progressText.innerText = "0%";
 
-    // Przesyłamy Nick oraz zapisany RAM
-    const finalRam = localStorage.getItem('reaper_ram') || 2;
+    // ZMIANA: Wysyłamy RAM wyciągnięty specjalnie dla wybranego profilu
+    const finalRam = ramProfiles[selectedAccount] || 2;
     ipcRenderer.send('start-game', { username: selectedAccount, ram: finalRam });
 });
 
