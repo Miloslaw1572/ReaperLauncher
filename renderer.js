@@ -33,11 +33,11 @@ const progressText = document.getElementById('progressText');
 // --- ZMIENNE STANOWE ---
 let accounts = JSON.parse(localStorage.getItem('reaper_accounts')) || [];
 let selectedAccount = localStorage.getItem('reaper_last_nick') || null;
-// ZMIANA: Zamiast jednej wartości, trzymamy obiekt z profilami RAM
 let ramProfiles = JSON.parse(localStorage.getItem('reaper_ram_profiles')) || {};
 let runningInstances = 0;
 let isLaunching = false;
 let accountToDelete = null;
+let launchCooldown; // Zmienna pilnująca blokady czasu
 
 // --- OBLICZANIE RAMU (50% komputera) ---
 const totalRAMBytes = os.totalmem();
@@ -66,7 +66,6 @@ document.getElementById('btnSettings').onclick = () => {
         poleStatusu.style.color = "#ff4c4c";
         return;
     }
-    // Pobieramy RAM dla TEGO konkretnego konta
     let ramForSelected = ramProfiles[selectedAccount] || 2;
     settingsAccountLabel.innerText = selectedAccount;
     syncRamDisplay(ramForSelected);
@@ -79,7 +78,6 @@ document.getElementById('modalSettingsCancelBtn').onclick = () => {
 
 document.getElementById('modalSettingsSaveBtn').onclick = () => {
     syncRamDisplay(ramInput.value);
-    // Zapisujemy RAM dla TEGO konkretnego konta
     ramProfiles[selectedAccount] = parseInt(ramInput.value);
     localStorage.setItem('reaper_ram_profiles', JSON.stringify(ramProfiles));
     settingsModal.style.display = 'none';
@@ -204,7 +202,6 @@ modalDeleteConfirmBtn.onclick = () => {
         accounts = accounts.filter(a => a !== accountToDelete);
         localStorage.setItem('reaper_accounts', JSON.stringify(accounts));
 
-        // Czyścimy też przypisany mu RAM, żeby nie zaśmiecać dysku
         delete ramProfiles[accountToDelete];
         localStorage.setItem('reaper_ram_profiles', JSON.stringify(ramProfiles));
 
@@ -248,7 +245,6 @@ btnGraj.addEventListener('click', () => {
     progressBar.value = 0;
     progressText.innerText = "0%";
 
-    // ZMIANA: Wysyłamy RAM wyciągnięty specjalnie dla wybranego profilu
     const finalRam = ramProfiles[selectedAccount] || 2;
     ipcRenderer.send('start-game', { username: selectedAccount, ram: finalRam });
 });
@@ -272,17 +268,33 @@ ipcRenderer.on('file-progress', (event, data) => {
 });
 
 ipcRenderer.on('game-started', () => {
-    poleStatusu.style.color = "#2ecc71";
-    poleStatusu.innerText = "Minecraft pomyślnie uruchomiony!";
-    progressContainer.style.display = "none";
-    isLaunching = false;
+    // Od razu zliczamy, że gra działa, ale NIE odblokowujemy jeszcze przycisku!
     runningInstances++;
-    aktualizujPrzyciskGraj();
+    progressContainer.style.display = "none";
+
+    poleStatusu.style.color = "#e67e22"; // Pomarańczowy kolor (ostrzegawczy)
+    poleStatusu.innerText = "Uruchamianie... (Poczekaj chwilę na wczytanie plików gry)";
+
+    // Ustawiamy timer: Po 15 sekundach przycisk się odblokuje
+    launchCooldown = setTimeout(() => {
+        isLaunching = false;
+        poleStatusu.style.color = "#2ecc71"; // Zielony
+        poleStatusu.innerText = "Gra załadowana! Możesz odpalić kolejne konto.";
+        aktualizujPrzyciskGraj();
+    }, 15000);
 });
 
 ipcRenderer.on('game-closed', () => {
     runningInstances--;
     if (runningInstances < 0) runningInstances = 0;
+
+    // Gdyby jakimś cudem gra wysypała się (crash) przed upływem 15 sekund,
+    // musimy awaryjnie odblokować przycisk, przerywając timer.
+    if (isLaunching && runningInstances === 0) {
+        clearTimeout(launchCooldown);
+        isLaunching = false;
+    }
+
     poleStatusu.style.color = "#ccc";
     poleStatusu.innerText = `Gra zamknięta. (Uruchomione: ${runningInstances}/2)`;
     aktualizujPrzyciskGraj();
