@@ -21,7 +21,6 @@
             align-items: center;
             justify-content: flex-start;
         }
-        /* --- GUZIKI W PRAWYM GÓRNYM ROGU --- */
         
         .top-right-controls {
             position: absolute;
@@ -29,7 +28,6 @@
             right: 20px;
             display: flex;
             gap: 15px;
-            /* Odstęp między guzikami */
             z-index: 100;
         }
         
@@ -44,7 +42,6 @@
             cursor: pointer;
             transition: 0.2s;
             height: 40px;
-            /* Taka sama wysokość jak ikony */
             display: flex;
             align-items: center;
         }
@@ -70,7 +67,6 @@
         #btnSettings img {
             width: 24px;
             height: 24px;
-            /* Ten filtr sprawia, że szara ikona staje się zółta */
             filter: invert(75%) sepia(50%) saturate(1000%) hue-rotate(360deg) brightness(100%) contrast(100%);
             transition: 0.2s;
         }
@@ -82,7 +78,6 @@
         #btnSettings:hover img {
             filter: brightness(0);
         }
-        /* Ikona staje się czarna po najechaniu */
         
         #mainLogo {
             width: 160px;
@@ -107,7 +102,6 @@
             margin-top: 0;
             font-size: 28px;
         }
-        /* --- ZAAWANSOWANY SYSTEM KONT --- */
         
         .account-manager {
             position: relative;
@@ -243,7 +237,6 @@
             color: #922b21;
             background-color: transparent;
         }
-        /* --- OKIENKA MODALNE --- */
         
         .modal-overlay {
             position: fixed;
@@ -284,6 +277,7 @@
             border-radius: 5px;
             color: white;
             text-align: center;
+            box-sizing: border-box;
         }
         
         .modal-content input:focus {
@@ -330,6 +324,26 @@
             background-color: #e74c3c;
         }
         
+        .btn-modal-ms {
+            background-color: #107c10;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+        }
+        
+        .btn-modal-ms:hover {
+            background-color: #0c5c0c;
+        }
+        
+        .ms-logo-icon {
+            height: 20px;
+            width: auto;
+            filter: none;
+        }
+        
         #modalError {
             color: #e74c3c;
             font-size: 12px;
@@ -337,7 +351,11 @@
             display: none;
             font-weight: bold;
         }
-        /* --- STYL SUWAKA RAM --- */
+        
+        .divider {
+            border-bottom: 1px solid #444;
+            margin: 20px 0;
+        }
         
         input[type=range] {
             -webkit-appearance: none;
@@ -362,7 +380,6 @@
             background: #444;
             border-radius: 2px;
         }
-        /* --- RESZTA STYLÓW --- */
         
         #playBtn {
             width: 100%;
@@ -460,14 +477,13 @@
         }
         
         #btnTt img {
-            transform: scale(1.4);
+            transform: scale(1.2);
         }
     </style>
 </head>
 
 <body>
 
-    <!-- NOWE MENU W PRAWYM GÓRNYM ROGU -->
     <div class="top-right-controls">
         <button id="btnOpenMods">Dodaj własne mody</button>
         <button id="btnSettings" title="Ustawienia"><img src="icon_settings.png" alt="Opcje"></button>
@@ -508,15 +524,30 @@
         </div>
     </div>
 
-    <!-- OKIENKA MODALNE -->
     <div id="addAccountModal" class="modal-overlay">
         <div class="modal-content">
-            <h3>Wprowadź nick</h3>
+            <h3>Dodaj Konto</h3>
             <p id="modalError">Błąd</p>
-            <input type="text" id="modalNickInput" placeholder="Twój nick" autocomplete="off">
-            <div class="modal-buttons">
-                <button id="modalCancelBtn" class="btn-modal btn-modal-cancel">Anuluj</button>
-                <button id="modalAddBtn" class="btn-modal btn-modal-add">Dodaj</button>
+
+            <div style="margin-bottom: 15px;">
+                <p style="color: #ccc; font-size: 13px; margin-bottom: 10px;">Konto Premium:</p>
+                <button id="btnMicrosoftLogin" class="btn-modal btn-modal-ms">
+                    Zaloguj przez Microsoft
+                    <img src="ms_logo.png" alt="MS Logo" class="ms-logo-icon">
+                </button>
+                <p id="msLoginStatus" style="color: #f1c40f; font-size: 12px; display: none; margin-top: 10px;">Oczekiwanie...</p>
+            </div>
+
+            <div class="divider"></div>
+
+            <div style="margin-top: 15px;">
+                <p style="color: #ccc; font-size: 13px; margin-bottom: 10px;">Konto Non-premium:</p>
+                <input type="text" id="modalNickInput" placeholder="Wpisz dowolny nick" autocomplete="off">
+                <button id="modalAddBtn" class="btn-modal btn-modal-add" style="width: 100%;">Dodaj</button>
+            </div>
+
+            <div class="modal-buttons" style="margin-top: 20px;">
+                <button id="modalCancelBtn" class="btn-modal btn-modal-cancel">Zamknij okno</button>
             </div>
         </div>
     </div>
@@ -532,18 +563,14 @@
         </div>
     </div>
 
-    <!-- NOWE OKIENKO MODALNE (Ustawienia RAM) -->
     <div id="settingsModal" class="modal-overlay">
         <div class="modal-content">
-            <!-- DODANO TUTAJ SPAN Z NICKIEM -->
             <h3>Ustawienia: <span id="settingsAccountLabel" style="color: #fff;"></span></h3>
             <p style="color: #ccc; font-size: 13px; margin-bottom: 10px;">Przydział pamięci RAM (GB):</p>
-
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
                 <input type="range" id="ramSlider" min="2" max="8" step="1" style="flex-grow: 1;">
                 <input type="number" id="ramInput" min="2" max="8" style="width: 50px; margin-bottom: 0; padding: 8px;">
             </div>
-
             <div class="modal-buttons">
                 <button id="modalSettingsCancelBtn" class="btn-modal btn-modal-cancel">Anuluj</button>
                 <button id="modalSettingsSaveBtn" class="btn-modal btn-modal-add">Zapisz</button>
@@ -552,7 +579,6 @@
     </div>
 
     <script src="./renderer.js"></script>
-
 </body>
 
 </html>

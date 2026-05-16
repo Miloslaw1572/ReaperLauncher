@@ -88,7 +88,7 @@ onlyShowSecureChat:false
 panoramaScrollSpeed:1.0
 telemetryOptInExtra:false
 onboardAccessibility:false
-menuBackgroundBlurriness:5
+menuBackgroundBlurriness:0
 startedCleanly:true
 key_key.attack:key.mouse.left
 key_key.use:key.mouse.right

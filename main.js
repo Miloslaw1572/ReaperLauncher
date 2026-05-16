@@ -6,6 +6,7 @@ gracefulFs.gracefulify(realFs);
 
 const { app, BrowserWindow, ipcMain, shell, screen } = require('electron');
 const { Client, Authenticator } = require('minecraft-launcher-core');
+const { Auth } = require('msmc');
 const path = require('path');
 const fs = require('fs-extra');
 
@@ -19,10 +20,7 @@ function createWindow() {
         autoHideMenuBar: true,
         title: 'ReaperLauncher',
         icon: path.join(__dirname, 'reaper_logo.png'),
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
-        }
+        webPreferences: { nodeIntegration: true, contextIsolation: false }
     });
     mainWindow.loadFile('index.html');
 }
@@ -31,14 +29,30 @@ app.whenReady().then(createWindow);
 
 ipcMain.on('open-mods-folder', () => {
     const modsPath = path.join(app.getPath('appData'), '.reaperclient', 'mods');
-    if (!fs.existsSync(modsPath)) {
-        fs.mkdirSync(modsPath, { recursive: true });
-    }
+    if (!fs.existsSync(modsPath)) { fs.mkdirSync(modsPath, { recursive: true }); }
     shell.openPath(modsPath);
 });
 
+// --- LOGIKA OKNA MICROSOFT ---
+ipcMain.on('login-microsoft', async(event) => {
+    try {
+        const authManager = new Auth("select_account");
+        const xboxManager = await authManager.launch("electron");
+        const token = await xboxManager.getMinecraft();
+        const mclcAuth = token.mclc();
+
+        event.reply('microsoft-login-success', { nick: mclcAuth.name, auth: mclcAuth });
+    } catch (err) {
+        console.error("Błąd logowania Microsoft:", err);
+        event.reply('microsoft-login-error', "Logowanie zostało przerwane przez gracza lub wystąpił błąd.");
+    }
+});
+
+// --- GŁÓWNA LOGIKA URUCHAMIANIA GRY ---
 ipcMain.on('start-game', (event, data) => {
-    const username = data.username;
+
+    const account = data.account;
+    const username = account.nick;
     const przydzielonyRam = data.ram;
     const launcher = new Client();
 
@@ -48,7 +62,6 @@ ipcMain.on('start-game', (event, data) => {
     fs.ensureDirSync(mainDir);
     fs.ensureDirSync(profileDir);
 
-    // 1. Kopiowanie Dodatkowych Plików (Java, mody, configi) do głównego folderu
     const basepath = app.isPackaged ? process.resourcesPath : __dirname;
     const extraFiles = path.join(basepath, 'DodatkowePliki');
 
@@ -56,38 +69,24 @@ ipcMain.on('start-game', (event, data) => {
         fs.copySync(extraFiles, mainDir, { overwrite: false });
     }
 
-    // 2. Logika Pierwszego Uruchomienia dla KAŻDEGO nowego profilu
     const profileOptions = path.join(profileDir, 'options.txt');
 
     if (!fs.existsSync(profileOptions)) {
-        // Zdefiniowanie ścieżki do oryginalnego Minecrafta
         const oryginalnyMC = path.join(app.getPath('appData'), '.minecraft', 'options.txt');
         const domyslneZLaunchera = path.join(mainDir, 'options.txt');
 
         if (fs.existsSync(oryginalnyMC)) {
-            // PRIORYTET 1: Kopiujemy z .minecraft
-            try {
-                fs.copySync(oryginalnyMC, profileOptions);
-                console.log(`[Profil: ${username}] Skopiowano ustawienia z .minecraft`);
-            } catch (e) { console.error(e); }
+            try { fs.copySync(oryginalnyMC, profileOptions); } catch (e) {}
         } else if (fs.existsSync(domyslneZLaunchera)) {
-            // PRIORYTET 2: Jeśli brak .minecraft, bierzemy Twoje z DodatkowePliki
-            try {
-                fs.copySync(domyslneZLaunchera, profileOptions);
-                console.log(`[Profil: ${username}] Brak .minecraft, użyto domyślnych z DodatkowePliki`);
-            } catch (e) { console.error(e); }
+            try { fs.copySync(domyslneZLaunchera, profileOptions); } catch (e) {}
         }
     }
 
-    // 3. Wstrzykiwanie wymaganych skrótów klawiszowych (keybindy modów)
     if (fs.existsSync(profileOptions)) {
         try {
             let txt = fs.readFileSync(profileOptions, 'utf8');
             let changed = false;
-            const binds = [
-                "key_Start/Stop Rollowanie:key.keyboard.apostrophe",
-                "key_Toggle Freelook:key.keyboard.left.alt"
-            ];
+            const binds = ["key_Start/Stop Rollowanie:key.keyboard.apostrophe", "key_Toggle Freelook:key.keyboard.left.alt", "menuBackgroundBlurriness:0"];
             binds.forEach(b => {
                 const keyName = b.split(':')[0] + ':';
                 if (!txt.includes(keyName)) {
@@ -100,7 +99,6 @@ ipcMain.on('start-game', (event, data) => {
         } catch (err) {}
     }
 
-    // 4. Ścieżki i Ekran
     const javaPath = path.join(mainDir, 'java', 'bin', 'javaw.exe');
     const screenArea = screen.getPrimaryDisplay().workAreaSize;
 
@@ -109,9 +107,11 @@ ipcMain.on('start-game', (event, data) => {
     fs.ensureDirSync(xaeroMinimapDir);
     fs.ensureDirSync(xaeroWorldMapDir);
 
-    // 5. Konfiguracja startowa
+    // --- WYBÓR AUTORYZACJI ---
+    const waznaAutoryzacja = account.type === 'premium' ? account.auth : Authenticator.getAuth(username);
+
     let options = {
-        authorization: Authenticator.getAuth(username),
+        authorization: waznaAutoryzacja,
         root: profileDir,
         javaPath: javaPath,
         version: {
