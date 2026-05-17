@@ -1,3 +1,4 @@
+// --- ZABEZPIECZENIE PRZED BŁĘDAMI DOSTĘPU DO PLIKÓW (EMFILE) ---
 const realFs = require('fs');
 const gracefulFs = require('graceful-fs');
 gracefulFs.gracefulify(realFs);
@@ -9,8 +10,8 @@ const path = require('path');
 const fs = require('fs-extra');
 const { autoUpdater } = require('electron-updater');
 
+// --- ZABEZPIECZENIE: BLOKADA WIELOKROTNEGO URUCHOMIENIA LAUNCHERA ---
 const gotTheLock = app.requestSingleInstanceLock();
-
 if (!gotTheLock) {
     app.quit();
     process.exit(0);
@@ -18,24 +19,27 @@ if (!gotTheLock) {
 
 let mainWindow;
 
+// --- GLOBALNE REJESTRY BLOKAD ---
+let isClientUpdating = false;
+const activeNicks = new Set(); // Przechowuje aktualnie włączone nicki graczy
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1280,
-        height: 755,
+        height: 755, // Powiększone o własny pasek
         resizable: false,
         autoHideMenuBar: true,
-        frame: false,
+        frame: false, // Brak systemowej ramki
         title: 'ReaperLauncher',
         icon: path.join(__dirname, 'reaper_logo.png'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            sandbox: false,
+            sandbox: false, // Wyłączenie piaskownicy dla preload.js (RAM)
             preload: path.join(__dirname, 'preload.js')
         }
     });
     mainWindow.loadFile('index.html');
-
 }
 
 app.on('second-instance', () => {
@@ -45,42 +49,55 @@ app.on('second-instance', () => {
     }
 });
 
-app.whenReady().then(createWindow);
-
-// --- SYSTEM AUTO-AKTUALIZACJI ---
+// --- INICJALIZACJA APLIKACJI I AUTO-UPDATERA ---
 app.whenReady().then(() => {
-    // Rozpocznij sprawdzanie aktualizacji po odpaleniu okna
+    createWindow();
+
+    // Sprawdzanie aktualizacji 2 sekundy po uruchomieniu
     setTimeout(() => {
         autoUpdater.checkForUpdatesAndNotify();
-    }, 2000); // 2 sekundy opóźnienia, żeby okno zdążyło się wczytać
+    }, 2000);
 });
 
+// --- STATUSY AUTO-AKTUALIZACJI ---
 autoUpdater.on('checking-for-update', () => {
     if (mainWindow) mainWindow.webContents.send('update-message', 'Sprawdzanie dostępności aktualizacji...');
 });
 
 autoUpdater.on('update-available', (info) => {
-    if (mainWindow) mainWindow.webContents.send('update-message', 'Znaleziono nową wersję! Przygotowywanie...');
+    isClientUpdating = true; // BLOKADA: Aktualizacja ruszyła
+    if (mainWindow) {
+        mainWindow.webContents.send('update-message', 'Znaleziono nową wersję! Przygotowywanie...');
+        mainWindow.webContents.send('update-state', true); // Wyłączamy guzik w UI
+    }
 });
 
 autoUpdater.on('update-not-available', (info) => {
-    if (mainWindow) mainWindow.webContents.send('update-message', 'Masz najnowszą wersję launchera.');
+    isClientUpdating = false; // ODBLOKOWANIE
+    if (mainWindow) {
+        mainWindow.webContents.send('update-message', `Masz najnowszą wersję launchera.`);
+        mainWindow.webContents.send('update-state', false);
+    }
 });
 
 autoUpdater.on('error', (err) => {
-    if (mainWindow) mainWindow.webContents.send('update-message', 'System aktualizacji działa tylko na skompilowanej wersji.');
+    isClientUpdating = false; // ODBLOKOWANIE
+    if (mainWindow) {
+        mainWindow.webContents.send('update-message', 'System aktualizacji działa tylko na skompilowanej wersji.');
+        mainWindow.webContents.send('update-state', false);
+    }
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
+    isClientUpdating = true;
     let log_message = 'Pobieranie aktualizacji: ' + Math.round(progressObj.percent) + '%';
     if (mainWindow) mainWindow.webContents.send('update-message', log_message);
 });
 
 autoUpdater.on('update-downloaded', (info) => {
     if (mainWindow) mainWindow.webContents.send('update-message', 'Aktualizacja pobrana! Cicha instalacja...');
-
     setTimeout(() => {
-        autoUpdater.quitAndInstall(true, true);
+        autoUpdater.quitAndInstall(true, true); // (true, true) = Instalacja w tle i automatyczny restart
     }, 3000);
 });
 
@@ -88,6 +105,7 @@ autoUpdater.on('update-downloaded', (info) => {
 ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.on('window-close', () => { if (mainWindow) mainWindow.close(); });
 
+// --- INNE AKCJE INTERFEJSU ---
 ipcMain.on('open-mods-folder', () => {
     const modsPath = path.join(app.getPath('appData'), '.reaperclient', 'mods');
     if (!fs.existsSync(modsPath)) { fs.mkdirSync(modsPath, { recursive: true }); }
@@ -106,6 +124,7 @@ ipcMain.on('login-microsoft', async(event) => {
     }
 });
 
+// --- INTELIGENTNE KOPIOWANIE ---
 function bezpieczneKopiowanieScentralizowane(src, dest) {
     if (!fs.existsSync(src)) return;
     const stat = fs.statSync(src);
@@ -144,6 +163,7 @@ function utworzWirtualnyFolder(glowny, profilowy) {
     } catch (err) { console.error(err); }
 }
 
+// --- GŁÓWNA LOGIKA URUCHAMIANIA GRY ---
 ipcMain.on('start-game', async(event, data) => {
     try {
         if (!data || !data.account || !data.account.nick) {
@@ -153,6 +173,20 @@ ipcMain.on('start-game', async(event, data) => {
 
         const username = String(data.account.nick).trim();
         const przydzielonyRam = data.ram;
+
+        // 1. BLOKADA: Sprawdzanie czy trwa aktualizacja klienta
+        if (isClientUpdating) {
+            event.reply('launcher-error', 'Nie można uruchomić gry! Trwa aktualizacja launchera.');
+            return;
+        }
+
+        // 2. BLOKADA: Sprawdzanie czy ten nick już gra
+        if (activeNicks.has(username)) {
+            event.reply('launcher-error', `Konto "${username}" jest już uruchomione!`);
+            return;
+        }
+
+        activeNicks.add(username);
         const launcher = new Client();
 
         const mainDir = path.join(app.getPath('appData'), '.reaperclient');
@@ -214,6 +248,7 @@ ipcMain.on('start-game', async(event, data) => {
 
         const javaPath = path.join(mainDir, 'java', 'bin', 'javaw.exe');
         if (!fs.existsSync(javaPath)) {
+            activeNicks.delete(username);
             fs.writeFileSync(path.join(profileDir, 'launcher_log.txt'), "KRYTYCZNY BŁĄD: Brak plików Java!\n");
             event.reply('game-closed');
             return;
@@ -239,12 +274,11 @@ ipcMain.on('start-game', async(event, data) => {
             detached: false
         };
 
-        // --- PEŁNY REJESTRATOR BŁĘDÓW (CZARNA SKRZYNKA) ---
+        // --- REJESTRATOR BŁĘDÓW (X-RAY DEBUG LOG) ---
         const logStream = fs.createWriteStream(path.join(profileDir, 'launcher_log.txt'), { flags: 'w' });
         logStream.write(`=== START PROFILU: ${username} | WERSJA LAUNCHERA: ${app.getVersion()} ===\n`);
 
         launcher.on('debug', (e) => logStream.write("[DEBUG]: " + e + "\n"));
-
         launcher.on('data', (e) => logStream.write("[GRA]: " + e + "\n"));
         launcher.on('progress', (e) => event.reply('file-progress', e));
 
@@ -254,31 +288,32 @@ ipcMain.on('start-game', async(event, data) => {
         });
 
         launcher.on('error', (e) => {
+            activeNicks.delete(username);
             logStream.write("\n[BŁĄD SILNIKA MCLC]: " + e + "\n");
-            console.error("Błąd silnika:", e);
             event.reply('game-closed');
         });
 
         launcher.on('close', (code) => {
+            activeNicks.delete(username);
             logStream.write(`\n=== ZAMKNIĘTO GRĘ (Kod wyjścia: ${code}) ===\n`);
             logStream.end();
             event.reply('game-closed');
         });
 
         launcher.launch(options).catch(err => {
+            activeNicks.delete(username);
             logStream.write("\n[BŁĄD KRYTYCZNY URUCHAMIANIA]: " + err.message + "\n");
-            if (err.stack) logStream.write("[SZCZEGÓŁY]: " + err.stack + "\n");
-            console.error("Krytyczny błąd:", err);
             event.reply('game-closed');
             logStream.end();
         });
 
     } catch (fatalErr) {
-        console.error("KRYTYCZNY BŁĄD PROCESU:", fatalErr);
+        if (data && data.account && data.account.nick) activeNicks.delete(String(data.account.nick).trim());
         event.reply('game-closed');
     }
 });
 
+// --- OBSŁUGA WERSJI NA ŻĄDANIE UI ---
 ipcMain.on('get-version', (event) => {
     event.reply('set-version', app.getVersion());
 });

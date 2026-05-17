@@ -1,11 +1,11 @@
-// --- BEZPIECZNE PRZYPISANIE GUZIKÓW PASKA (Zabezpieczone przed nullem!) ---
+//BEZPIECZNE PRZYPISANIE GUZIKÓW PASKA TYTUŁOWEGO
 const btnMinimize = document.getElementById('btnMinimize');
 if (btnMinimize) btnMinimize.onclick = () => { window.api.send('window-minimize'); };
 
 const btnClose = document.getElementById('btnClose');
 if (btnClose) btnClose.onclick = () => { window.api.send('window-close'); };
 
-// Reszta przycisków
+//DOM ELEMENTS
 const btnEmptyAddAccount = document.getElementById('btnEmptyAddAccount');
 const accountSelectorContainer = document.getElementById('accountSelectorContainer');
 const customSelectToggle = document.getElementById('customSelectToggle');
@@ -37,6 +37,7 @@ const progressContainer = document.getElementById('progressContainer');
 const progressBar = document.getElementById('progressBar');
 const progressText = document.getElementById('progressText');
 
+// --- ZARZĄDZANIE STANEM APLIKACJI ---
 let accounts = JSON.parse(localStorage.getItem('reaper_accounts')) || [];
 
 if (accounts.length > 0 && typeof accounts[0] === 'string') {
@@ -50,8 +51,9 @@ let runningInstances = 0;
 let isLaunching = false;
 let accountToDelete = null;
 let launchCooldown;
+let isClientUpdating = false;
 
-// API
+//API: RAM
 const totalRAMBytes = window.api.getTotalMemory();
 const totalRAMGB = totalRAMBytes / (1024 * 1024 * 1024);
 const maxRAMAllowed = Math.max(2, Math.floor(totalRAMGB / 2));
@@ -66,6 +68,7 @@ function syncRamDisplay(value) {
     ramInput.value = num;
 }
 
+//LINKI
 if (document.getElementById('btnOpenMods')) {
     document.getElementById('btnOpenMods').onclick = () => { window.api.send('open-mods-folder'); };
 }
@@ -77,11 +80,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('btnDc')) document.getElementById('btnDc').onclick = () => { window.api.openLink('https://discord.com/invite/qhdHUbE7sp'); };
 });
 
+//USTAWIENIA PROFILU
 if (document.getElementById('btnSettings')) {
     document.getElementById('btnSettings').onclick = () => {
         if (!selectedAccountNick) {
             poleStatusu.innerText = "Najpierw dodaj lub wybierz konto!";
-            poleStatusu.style.color = "#ff4c4c";
+            poleStatusu.style.color = "#e74c3c";
             return;
         }
         let ramForSelected = ramProfiles[selectedAccountNick] || 2;
@@ -107,6 +111,7 @@ if (document.getElementById('modalSettingsSaveBtn')) {
 ramSlider.oninput = (e) => syncRamDisplay(e.target.value);
 ramInput.onchange = (e) => syncRamDisplay(e.target.value);
 
+//RYSOWANIE KONT
 function renderAccounts() {
     if (accounts.length === 0) {
         btnEmptyAddAccount.style.display = 'block';
@@ -198,6 +203,7 @@ btnEmptyAddAccount.onclick = otworzModal;
 btnPlus.onclick = otworzModal;
 modalCancelBtn.onclick = zamknijModal;
 
+//LOGOWANIE OFFLINE
 modalAddBtn.onclick = () => {
     const nick = modalNickInput.value.trim();
     if (nick.length < 3) {
@@ -218,6 +224,7 @@ modalAddBtn.onclick = () => {
     renderAccounts();
 };
 
+//LOGOWANIE MICROSOFT
 btnMicrosoftLogin.onclick = () => {
     btnMicrosoftLogin.disabled = true;
     msLoginStatus.innerText = "Otwieranie bezpiecznego okna Microsoft...";
@@ -245,6 +252,7 @@ window.api.receive('microsoft-login-error', (errorMsg) => {
     msLoginStatus.style.color = "#e74c3c";
 });
 
+//USUWANIE KONT
 modalDeleteCancelBtn.onclick = () => {
     deleteAccountModal.style.display = 'none';
     accountToDelete = null;
@@ -261,11 +269,16 @@ modalDeleteConfirmBtn.onclick = () => {
     accountToDelete = null;
 };
 
+//LOGIKA URUCHAMIANIA GRY
 function aktualizujPrzyciskGraj() {
     if (accounts.length === 0) {
         btnGraj.disabled = true;
         btnGraj.innerText = "Brak konta";
         btnGraj.style.backgroundColor = "#555";
+    } else if (isClientUpdating) {
+        btnGraj.disabled = true;
+        btnGraj.innerText = "Aktualizacja...";
+        btnGraj.style.backgroundColor = "#d35400";
     } else if (isLaunching) {
         btnGraj.disabled = true;
         btnGraj.innerText = "Uruchamianie...";
@@ -282,7 +295,7 @@ function aktualizujPrzyciskGraj() {
 }
 
 btnGraj.addEventListener('click', () => {
-    if (isLaunching || runningInstances >= 2 || accounts.length === 0) return;
+    if (isLaunching || runningInstances >= 2 || accounts.length === 0 || isClientUpdating) return;
 
     isLaunching = true;
     aktualizujPrzyciskGraj();
@@ -298,6 +311,21 @@ btnGraj.addEventListener('click', () => {
     window.api.send('start-game', { account: selectedAccountObj, ram: finalRam });
 });
 
+//ODBIERANIE BŁĘDÓW I BLOKAD
+window.api.receive('launcher-error', (msg) => {
+    isLaunching = false;
+    progressContainer.style.display = "none";
+    poleStatusu.style.color = "#e74c3c";
+    poleStatusu.innerText = msg;
+    aktualizujPrzyciskGraj();
+});
+
+window.api.receive('update-state', (state) => {
+    isClientUpdating = state;
+    aktualizujPrzyciskGraj();
+});
+
+//ODBIERANIE POSTĘPU POBIERANIA
 window.api.receive('file-progress', (data) => {
     const pobrane = data.task;
     const wszystkie = data.total;
@@ -313,9 +341,8 @@ window.api.receive('file-progress', (data) => {
 
     progressText.innerText = `${nazwaEtapu}: ${pobrane} / ${wszystkie} (${procent}%)`;
 
-    // NOWOŚĆ: Dynamiczna zmiana statusu pod paskiem, aby gracz wiedział co się dzieje
     if (procent >= 100) {
-        poleStatusu.style.color = "#f39c12"; // Pomarańczowy ostrzegawczy
+        poleStatusu.style.color = "#f39c12";
         poleStatusu.innerText = "Wypakowywanie plików i start Javy... (Może to potrwać dłuższą chwilę)";
     } else {
         poleStatusu.style.color = "#ccc";
@@ -323,11 +350,12 @@ window.api.receive('file-progress', (data) => {
     }
 });
 
+//ODBIERANIE STANU GRY
 window.api.receive('game-started', () => {
     runningInstances++;
     progressContainer.style.display = "none";
     poleStatusu.style.color = "#e67e22";
-    poleStatusu.innerText = "Uruchamianie... (Poczekaj chwilę na wczytanie plików gry)";
+    poleStatusu.innerText = "Uruchamianie... (Poczekaj chwilę na wczytanie okna Minecrafta)";
 
     launchCooldown = setTimeout(() => {
         isLaunching = false;
@@ -349,15 +377,12 @@ window.api.receive('game-closed', () => {
     aktualizujPrzyciskGraj();
 });
 
-renderAccounts();
-
-// --- ODBIERANIE STATUSU AUTO-AKTUALIZACJI ---
+//ODBIERANIE KOMUNIKATÓW AUTO-UPDATE
 window.api.receive('update-message', (msg) => {
     const updateElement = document.getElementById('updateStatusText');
     if (updateElement) {
         updateElement.innerText = msg;
-        // Zmiana koloru na złoty, gdy coś się pobiera
-        if (msg.includes('Pobieranie') || msg.includes('Znaleziono')) {
+        if (msg.includes('Pobieranie') || msg.includes('Znaleziono') || msg.includes('Cicha')) {
             updateElement.style.color = '#f1c40f';
         } else {
             updateElement.style.color = '#666';
@@ -365,13 +390,14 @@ window.api.receive('update-message', (msg) => {
     }
 });
 
-// --- ODBIERANIE WERSJI Z SILNIKA ---
+//ODBIERANIE WERSJI PAKIETU
 window.api.receive('set-version', (version) => {
     const versionElement = document.getElementById('appVersionText');
     if (versionElement) {
-        // Tu bierzemy czysty numer (np. 1.0.1) i doklejamy "v" na początku
         versionElement.innerText = `v${version}`;
     }
 });
 
+//INICJALIZACJA STARTOWA
 window.api.send('get-version');
+renderAccounts();
