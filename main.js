@@ -48,117 +48,193 @@ ipcMain.on('login-microsoft', async(event) => {
     }
 });
 
-// --- GŁÓWNA LOGIKA URUCHAMIANIA GRY ---
-ipcMain.on('start-game', (event, data) => {
+// --- INTELIGENTNY SILNIK GŁĘBOKIEGO KOPIOWANIA PACZKI ---
+// Zaktualizowany: Teraz prawidłowo wykrywa i zabezpiecza folder "xaero" oraz wszystkie jego podfoldery
+function bezpieczneKopiowanieScentralizowane(src, dest) {
+    if (!fs.existsSync(src)) return;
+    const stat = fs.statSync(src);
 
-    const account = data.account;
-    const username = account.nick;
-    const przydzielonyRam = data.ram;
-    const launcher = new Client();
+    if (stat.isDirectory()) {
+        fs.ensureDirSync(dest);
+        const items = fs.readdirSync(src);
+        for (const item of items) {
+            bezpieczneKopiowanieScentralizowane(path.join(src, item), path.join(dest, item));
+        }
+    } else {
+        // Sprawdzamy czy kopiowany plik należy do struktury folderu "xaero" (małe litery chronią przed błędami wielkości znaków)
+        const czyPlikXaero = dest.toLowerCase().includes('xaero');
 
-    const mainDir = path.join(app.getPath('appData'), '.reaperclient');
-    const profileDir = path.join(mainDir, 'profiles', username);
-
-    fs.ensureDirSync(mainDir);
-    fs.ensureDirSync(profileDir);
-
-    const basepath = app.isPackaged ? process.resourcesPath : __dirname;
-    const extraFiles = path.join(basepath, 'DodatkowePliki');
-
-    if (fs.existsSync(extraFiles)) {
-        fs.copySync(extraFiles, mainDir, { overwrite: false });
-    }
-
-    const profileOptions = path.join(profileDir, 'options.txt');
-
-    if (!fs.existsSync(profileOptions)) {
-        const oryginalnyMC = path.join(app.getPath('appData'), '.minecraft', 'options.txt');
-        const domyslneZLaunchera = path.join(mainDir, 'options.txt');
-
-        if (fs.existsSync(oryginalnyMC)) {
-            try { fs.copySync(oryginalnyMC, profileOptions); } catch (e) {}
-        } else if (fs.existsSync(domyslneZLaunchera)) {
-            try { fs.copySync(domyslneZLaunchera, profileOptions); } catch (e) {}
+        if (czyPlikXaero) {
+            // Kopiujemy pliki z Twojego folderu xaero TYLKO jeśli nie ma ich jeszcze na dysku.
+            // Dzięki temu każdy nowy profil dostaje Twoje waypointy na start, ale nie kasujemy punktów, które gracz doda sam w trakcie gry!
+            if (!fs.existsSync(dest)) {
+                try { fs.copySync(src, dest); } catch (e) {}
+            }
+        } else {
+            // Wszystkie inne pliki (mody, configi, wersje) zawsze się aktualizują do Twojej najnowszej wersji paczki
+            try { fs.copySync(src, dest, { overwrite: true }); } catch (e) {}
         }
     }
+}
 
-    if (fs.existsSync(profileOptions)) {
-        try {
-            let txt = fs.readFileSync(profileOptions, 'utf8');
-            let changed = false;
-            const binds = ["key_Start/Stop Rollowanie:key.keyboard.apostrophe", "key_Toggle Freelook:key.keyboard.left.alt", "menuBackgroundBlurriness:0"];
-            binds.forEach(b => {
-                const keyName = b.split(':')[0] + ':';
-                if (!txt.includes(keyName)) {
-                    if (!txt.endsWith('\n')) txt += '\n';
-                    txt += b + '\n';
-                    changed = true;
-                }
-            });
-            if (changed) fs.writeFileSync(profileOptions, txt, 'utf8');
-        } catch (err) {}
-    }
-
-    const javaPath = path.join(mainDir, 'java', 'bin', 'javaw.exe');
-    const screenArea = screen.getPrimaryDisplay().workAreaSize;
-
-    const xaeroMinimapDir = path.join(mainDir, 'XaeroWaypoints').replace(/\\/g, '/');
-    const xaeroWorldMapDir = path.join(mainDir, 'XaeroWorldMap').replace(/\\/g, '/');
-    fs.ensureDirSync(xaeroMinimapDir);
-    fs.ensureDirSync(xaeroWorldMapDir);
-
-    // --- WYBÓR AUTORYZACJI ---
-    const waznaAutoryzacja = account.type === 'premium' ? account.auth : Authenticator.getAuth(username);
-
-    let options = {
-        authorization: waznaAutoryzacja,
-        root: profileDir,
-        javaPath: javaPath,
-        version: {
-            number: "1.21.5",
-            type: "release",
-            custom: "fabric-loader-0.19.2-1.21.5"
-        },
-        memory: {
-            max: `${przydzielonyRam}G`,
-            min: "2G"
-        },
-        window: {
-            width: screenArea.width,
-            height: screenArea.height
-        },
-        customArgs: [
-            `-Dxaero.minimap.waypoints=${xaeroMinimapDir}`,
-            `-Dxaero.worldmap.dir=${xaeroWorldMapDir}`
-        ],
-        overrides: {
-            path: {
-                root: profileDir,
-                meta: path.join(mainDir, 'versions'),
-                assets: path.join(mainDir, 'assets'),
-                library: path.join(mainDir, 'libraries'),
-                version: path.join(mainDir, 'versions'),
-                mods: path.join(mainDir, 'mods'),
-                xaerowaypoints: path.join(mainDir, 'XaeroWaypoints'),
-                xaeroworldmap: path.join(mainDir, 'XaeroWorldMap')
-            }
-        },
-        detached: false
-    };
-
-    const logStream = fs.createWriteStream(path.join(profileDir, 'launcher_log.txt'), { flags: 'w' });
-    launcher.on('data', (e) => logStream.write("[GRA]: " + e + "\n"));
-    launcher.on('progress', (e) => event.reply('file-progress', e));
-    launcher.on('arguments', () => event.reply('game-started'));
-
-    launcher.on('close', (code) => {
-        logStream.end();
-        event.reply('game-closed');
-    });
+// --- FUNKCJA TWORZĄCA BEZPIECZNE TUNELE (JUNCTIONS) ---
+function utworzWirtualnyFolder(glowny, profilowy) {
+    fs.ensureDirSync(glowny);
+    try {
+        fs.lstatSync(profilowy);
+        fs.removeSync(profilowy);
+    } catch (err) {}
 
     try {
-        launcher.launch(options);
+        fs.symlinkSync(glowny, profilowy, 'junction');
+        console.log(`[Junction] Połączono folder: ${profilowy}`);
     } catch (err) {
-        console.error("Błąd krytyczny:", err);
+        console.error(`Nie udało się utworzyć tunelu dla ${profilowy}:`, err);
+    }
+}
+
+// --- GŁÓWNA LOGIKA URUCHAMIANIA GRY ---
+ipcMain.on('start-game', async(event, data) => {
+    try {
+        if (!data || !data.account || !data.account.nick) {
+            event.reply('game-closed');
+            return;
+        }
+
+        const username = String(data.account.nick).trim();
+        const przydzielonyRam = data.ram;
+        const launcher = new Client();
+
+        const mainDir = path.join(app.getPath('appData'), '.reaperclient');
+        const profileDir = path.join(mainDir, 'profiles', username);
+
+        fs.ensureDirSync(mainDir);
+        fs.ensureDirSync(profileDir);
+
+        // 1. Głębokie kopiowanie Twoich plików (w tym całego folderu xaero)
+        const basepath = app.isPackaged ? process.resourcesPath : __dirname;
+        const extraFiles = path.join(basepath, 'DodatkowePliki');
+
+        if (fs.existsSync(extraFiles)) {
+            bezpieczneKopiowanieScentralizowane(extraFiles, mainDir);
+        }
+
+        // 2. Tworzenie wirtualnych folderów dla profilu
+        // ZMIANA: Zastąpiliśmy XaeroWaypoints/WorldMap jednym, fizycznym folderem 'xaero'
+        const folderyWspoldzielone = [
+            'assets', 'libraries', 'versions', 'mods',
+            'xaero',
+            'config', 'shaderpacks', 'resourcepacks', 'defaultconfigs'
+        ];
+
+        for (const folder of folderyWspoldzielone) {
+            utworzWirtualnyFolder(path.join(mainDir, folder), path.join(profileDir, folder));
+        }
+
+        // Kopiowanie listy serwerów
+        const serversDatGlowny = path.join(mainDir, 'servers.dat');
+        const serversDatProfil = path.join(profileDir, 'servers.dat');
+        if (fs.existsSync(serversDatGlowny) && !fs.existsSync(serversDatProfil)) {
+            try { fs.copySync(serversDatGlowny, serversDatProfil); } catch (e) {}
+        }
+
+        // Ustawienia Gracza (options.txt)
+        const profileOptions = path.join(profileDir, 'options.txt');
+        if (!fs.existsSync(profileOptions)) {
+            const oryginalnyMC = path.join(app.getPath('appData'), '.minecraft', 'options.txt');
+            const domyslneZLaunchera = path.join(mainDir, 'options.txt');
+
+            if (fs.existsSync(oryginalnyMC)) {
+                try { fs.copySync(oryginalnyMC, profileOptions); } catch (e) {}
+            } else if (fs.existsSync(domyslneZLaunchera)) {
+                try { fs.copySync(domyslneZLaunchera, profileOptions); } catch (e) {}
+            }
+        }
+
+        if (fs.existsSync(profileOptions)) {
+            try {
+                let txt = fs.readFileSync(profileOptions, 'utf8');
+                let changed = false;
+                const binds = ["key_Start/Stop Rollowanie:key.keyboard.apostrophe", "key_Toggle Freelook:key.keyboard.left.alt", "menuBackgroundBlurriness:0"];
+                binds.forEach(b => {
+                    const keyName = b.split(':')[0] + ':';
+                    if (!txt.includes(keyName)) {
+                        if (!txt.endsWith('\n')) txt += '\n';
+                        txt += b + '\n';
+                        changed = true;
+                    }
+                });
+                if (changed) fs.writeFileSync(profileOptions, txt, 'utf8');
+            } catch (err) {}
+        }
+
+        // Java
+        const javaPath = path.join(mainDir, 'java', 'bin', 'javaw.exe');
+        if (!fs.existsSync(javaPath)) {
+            console.error("BŁĄD: Nie znaleziono Javy w ścieżce: " + javaPath);
+            fs.writeFileSync(path.join(profileDir, 'launcher_log.txt'), "KRYTYCZNY BŁĄD: Brak plików Java!\n");
+            event.reply('game-closed');
+            return;
+        }
+
+        const screenArea = screen.getPrimaryDisplay().workAreaSize;
+
+        // Autoryzacja
+        let waznaAutoryzacja;
+        if (data.account.type === 'premium') {
+            waznaAutoryzacja = data.account.auth;
+        } else {
+            const tempAuth = Authenticator.getAuth(username);
+            waznaAutoryzacja = tempAuth instanceof Promise ? await tempAuth : tempAuth;
+        }
+
+        let options = {
+            authorization: waznaAutoryzacja,
+            root: profileDir,
+            javaPath: javaPath,
+            version: {
+                number: "1.21.5",
+                type: "release",
+                custom: "fabric-loader-0.19.2-1.21.5"
+            },
+            memory: {
+                max: `${przydzielonyRam}G`,
+                min: "2G"
+            },
+            window: {
+                width: screenArea.width,
+                height: screenArea.height
+            },
+            detached: false
+        };
+
+        const logStream = fs.createWriteStream(path.join(profileDir, 'launcher_log.txt'), { flags: 'w' });
+        logStream.write(`=== START PROFILU: ${username} | RAM: ${przydzielonyRam}GB ===\n`);
+
+        launcher.on('data', (e) => logStream.write("[GRA]: " + e + "\n"));
+        launcher.on('progress', (e) => event.reply('file-progress', e));
+        launcher.on('arguments', () => event.reply('game-started'));
+
+        launcher.on('error', (e) => {
+            logStream.write("[BŁĄD LAUNCHERA]: " + e + "\n");
+            console.error("Błąd silnika:", e);
+            event.reply('game-closed');
+        });
+
+        launcher.on('close', (code) => {
+            logStream.write(`\n=== ZAMKNIĘTO GRĘ (Kod wyjścia: ${code}) ===`);
+            logStream.end();
+            event.reply('game-closed');
+        });
+
+        launcher.launch(options).catch(err => {
+            logStream.write("[BŁĄD KRYTYCZNY URUCHAMIANIA]: " + err + "\n");
+            console.error("Błąd launch:", err);
+            event.reply('game-closed');
+        });
+
+    } catch (fatalErr) {
+        console.error("KRYTYCZNY BŁĄD PROCESU:", fatalErr);
+        event.reply('game-closed');
     }
 });
