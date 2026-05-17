@@ -77,9 +77,10 @@ autoUpdater.on('download-progress', (progressObj) => {
 });
 
 autoUpdater.on('update-downloaded', (info) => {
-    if (mainWindow) mainWindow.webContents.send('update-message', 'Aktualizacja pobrana! Restartowanie w 3 sekundy...');
+    if (mainWindow) mainWindow.webContents.send('update-message', 'Aktualizacja pobrana! Cicha instalacja...');
+
     setTimeout(() => {
-        autoUpdater.quitAndInstall();
+        autoUpdater.quitAndInstall(true, true);
     }, 3000);
 });
 
@@ -238,26 +239,46 @@ ipcMain.on('start-game', async(event, data) => {
             detached: false
         };
 
+        // --- PEŁNY REJESTRATOR BŁĘDÓW (CZARNA SKRZYNKA) ---
         const logStream = fs.createWriteStream(path.join(profileDir, 'launcher_log.txt'), { flags: 'w' });
+        logStream.write(`=== START PROFILU: ${username} | WERSJA LAUNCHERA: ${app.getVersion()} ===\n`);
+
+        launcher.on('debug', (e) => logStream.write("[DEBUG]: " + e + "\n"));
 
         launcher.on('data', (e) => logStream.write("[GRA]: " + e + "\n"));
         launcher.on('progress', (e) => event.reply('file-progress', e));
-        launcher.on('arguments', () => event.reply('game-started'));
-        launcher.on('error', (e) => { event.reply('game-closed'); });
+
+        launcher.on('arguments', (args) => {
+            logStream.write("[SUKCES]: Zbudowano argumenty startowe Javy.\n");
+            event.reply('game-started');
+        });
+
+        launcher.on('error', (e) => {
+            logStream.write("\n[BŁĄD SILNIKA MCLC]: " + e + "\n");
+            console.error("Błąd silnika:", e);
+            event.reply('game-closed');
+        });
+
         launcher.on('close', (code) => {
+            logStream.write(`\n=== ZAMKNIĘTO GRĘ (Kod wyjścia: ${code}) ===\n`);
+            logStream.end();
+            event.reply('game-closed');
+        });
+
+        launcher.launch(options).catch(err => {
+            logStream.write("\n[BŁĄD KRYTYCZNY URUCHAMIANIA]: " + err.message + "\n");
+            if (err.stack) logStream.write("[SZCZEGÓŁY]: " + err.stack + "\n");
+            console.error("Krytyczny błąd:", err);
             event.reply('game-closed');
             logStream.end();
         });
 
-        launcher.launch(options).catch(err => { event.reply('game-closed'); });
-
     } catch (fatalErr) {
+        console.error("KRYTYCZNY BŁĄD PROCESU:", fatalErr);
         event.reply('game-closed');
     }
 });
 
-// --- OBSŁUGA WERSJI ---
 ipcMain.on('get-version', (event) => {
-    // Gdy interfejs zapyta o wersję, silnik odpowiada:
     event.reply('set-version', app.getVersion());
 });

@@ -310,7 +310,17 @@ window.api.receive('file-progress', (data) => {
     if (typ === 'assets') nazwaEtapu = "Pobieranie tekstur i dźwięków";
     else if (typ === 'classes' || typ === 'libraries') nazwaEtapu = "Pobieranie bibliotek gry";
     else if (typ === 'natives') nazwaEtapu = "Pobieranie rdzenia";
+
     progressText.innerText = `${nazwaEtapu}: ${pobrane} / ${wszystkie} (${procent}%)`;
+
+    // NOWOŚĆ: Dynamiczna zmiana statusu pod paskiem, aby gracz wiedział co się dzieje
+    if (procent >= 100) {
+        poleStatusu.style.color = "#f39c12"; // Pomarańczowy ostrzegawczy
+        poleStatusu.innerText = "Wypakowywanie plików i start Javy... (Może to potrwać dłuższą chwilę)";
+    } else {
+        poleStatusu.style.color = "#ccc";
+        poleStatusu.innerText = "Trwa pobieranie i weryfikacja plików z serwerów...";
+    }
 });
 
 window.api.receive('game-started', () => {
