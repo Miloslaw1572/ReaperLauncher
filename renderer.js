@@ -354,3 +354,12 @@ window.api.receive('update-message', (msg) => {
         }
     }
 });
+
+// --- ODBIERANIE WERSJI Z SILNIKA ---
+window.api.receive('set-version', (version) => {
+    const versionElement = document.getElementById('appVersionText');
+    if (versionElement) {
+        // Tu bierzemy czysty numer (np. 1.0.1) i doklejamy "v" na początku
+        versionElement.innerText = `v${version}`;
+    }
+});

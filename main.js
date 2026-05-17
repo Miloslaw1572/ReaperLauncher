@@ -35,6 +35,11 @@ function createWindow() {
         }
     });
     mainWindow.loadFile('index.html');
+
+    mainWindow.webContents.on('did-finish-load', () => {
+        mainWindow.webContents.send('set-version', app.getVersion());
+    });
+
 }
 
 app.on('second-instance', () => {
