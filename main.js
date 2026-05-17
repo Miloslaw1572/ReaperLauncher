@@ -36,10 +36,6 @@ function createWindow() {
     });
     mainWindow.loadFile('index.html');
 
-    mainWindow.webContents.on('did-finish-load', () => {
-        mainWindow.webContents.send('set-version', app.getVersion());
-    });
-
 }
 
 app.on('second-instance', () => {
@@ -258,4 +254,10 @@ ipcMain.on('start-game', async(event, data) => {
     } catch (fatalErr) {
         event.reply('game-closed');
     }
+});
+
+// --- OBSŁUGA WERSJI ---
+ipcMain.on('get-version', (event) => {
+    // Gdy interfejs zapyta o wersję, silnik odpowiada:
+    event.reply('set-version', app.getVersion());
 });

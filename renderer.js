@@ -363,3 +363,5 @@ window.api.receive('set-version', (version) => {
         versionElement.innerText = `v${version}`;
     }
 });
+
+window.api.send('get-version');

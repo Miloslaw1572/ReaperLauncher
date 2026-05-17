@@ -3,7 +3,7 @@ const os = require('os');
 
 contextBridge.exposeInMainWorld('api', {
     send: (channel, data) => {
-        const validChannels = ['open-mods-folder', 'login-microsoft', 'start-game', 'window-minimize', 'window-close'];
+        const validChannels = ['open-mods-folder', 'login-microsoft', 'start-game', 'window-minimize', 'window-close', 'get-version'];
         if (validChannels.includes(channel)) {
             ipcRenderer.send(channel, data);
         }
