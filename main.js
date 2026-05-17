@@ -10,6 +10,15 @@ const { Auth } = require('msmc');
 const path = require('path');
 const fs = require('fs-extra');
 
+// --- ZABEZPIECZENIE: BLOKADA WIELOKROTNEGO URUCHOMIENIA LAUNCHERA ---
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    // Jeśli launcher już działa, natychmiast ubijamy ten drugi proces
+    app.quit();
+    process.exit(0);
+}
+
 let mainWindow;
 
 function createWindow() {
@@ -24,6 +33,14 @@ function createWindow() {
     });
     mainWindow.loadFile('index.html');
 }
+
+// Jeśli ktoś próbuje otworzyć drugi launcher, po prostu wysuńmy ten pierwszy na wierzch
+app.on('second-instance', (event, commandLine, workingDirectory) => {
+    if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+    }
+});
 
 app.whenReady().then(createWindow);
 
@@ -49,7 +66,6 @@ ipcMain.on('login-microsoft', async(event) => {
 });
 
 // --- INTELIGENTNY SILNIK GŁĘBOKIEGO KOPIOWANIA PACZKI ---
-// Zaktualizowany: Teraz prawidłowo wykrywa i zabezpiecza folder "xaero" oraz wszystkie jego podfoldery
 function bezpieczneKopiowanieScentralizowane(src, dest) {
     if (!fs.existsSync(src)) return;
     const stat = fs.statSync(src);
@@ -61,17 +77,13 @@ function bezpieczneKopiowanieScentralizowane(src, dest) {
             bezpieczneKopiowanieScentralizowane(path.join(src, item), path.join(dest, item));
         }
     } else {
-        // Sprawdzamy czy kopiowany plik należy do struktury folderu "xaero" (małe litery chronią przed błędami wielkości znaków)
         const czyPlikXaero = dest.toLowerCase().includes('xaero');
 
         if (czyPlikXaero) {
-            // Kopiujemy pliki z Twojego folderu xaero TYLKO jeśli nie ma ich jeszcze na dysku.
-            // Dzięki temu każdy nowy profil dostaje Twoje waypointy na start, ale nie kasujemy punktów, które gracz doda sam w trakcie gry!
             if (!fs.existsSync(dest)) {
                 try { fs.copySync(src, dest); } catch (e) {}
             }
         } else {
-            // Wszystkie inne pliki (mody, configi, wersje) zawsze się aktualizują do Twojej najnowszej wersji paczki
             try { fs.copySync(src, dest, { overwrite: true }); } catch (e) {}
         }
     }
@@ -111,7 +123,7 @@ ipcMain.on('start-game', async(event, data) => {
         fs.ensureDirSync(mainDir);
         fs.ensureDirSync(profileDir);
 
-        // 1. Głębokie kopiowanie Twoich plików (w tym całego folderu xaero)
+        // 1. Głębokie kopiowanie Twoich plików
         const basepath = app.isPackaged ? process.resourcesPath : __dirname;
         const extraFiles = path.join(basepath, 'DodatkowePliki');
 
@@ -120,7 +132,6 @@ ipcMain.on('start-game', async(event, data) => {
         }
 
         // 2. Tworzenie wirtualnych folderów dla profilu
-        // ZMIANA: Zastąpiliśmy XaeroWaypoints/WorldMap jednym, fizycznym folderem 'xaero'
         const folderyWspoldzielone = [
             'assets', 'libraries', 'versions', 'mods',
             'xaero',
