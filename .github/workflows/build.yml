@@ -1,0 +1,26 @@
+name: Build and Release Launcher
+
+# Skrypt uruchomi się TYLKO wtedy, gdy klikniesz odpowiedni guzik na GitHubie
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Pobieranie kodu
+        uses: actions/checkout@v3
+
+      - name: Instalacja środowiska Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Instalacja pakietów (npm install)
+        run: npm install
+
+      - name: Budowanie pliku .exe i publikacja!
+        run: npm run build -c.publish=github
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

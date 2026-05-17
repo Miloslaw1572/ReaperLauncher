@@ -1,20 +1,17 @@
-// --- ZABEZPIECZENIE PRZED BŁĘDAMI DOSTĘPU DO PLIKÓW (EMFILE) ---
 const realFs = require('fs');
 const gracefulFs = require('graceful-fs');
 gracefulFs.gracefulify(realFs);
-// --------------------------------------------------------------
 
 const { app, BrowserWindow, ipcMain, shell, screen } = require('electron');
 const { Client, Authenticator } = require('minecraft-launcher-core');
 const { Auth } = require('msmc');
 const path = require('path');
 const fs = require('fs-extra');
+const { autoUpdater } = require('electron-updater');
 
-// --- ZABEZPIECZENIE: BLOKADA WIELOKROTNEGO URUCHOMIENIA LAUNCHERA ---
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
-    // Jeśli launcher już działa, natychmiast ubijamy ten drugi proces
     app.quit();
     process.exit(0);
 }
@@ -24,18 +21,23 @@ let mainWindow;
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1280,
-        height: 720,
+        height: 755,
         resizable: false,
         autoHideMenuBar: true,
+        frame: false,
         title: 'ReaperLauncher',
         icon: path.join(__dirname, 'reaper_logo.png'),
-        webPreferences: { nodeIntegration: true, contextIsolation: false }
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: false,
+            preload: path.join(__dirname, 'preload.js')
+        }
     });
     mainWindow.loadFile('index.html');
 }
 
-// Jeśli ktoś próbuje otworzyć drugi launcher, po prostu wysuńmy ten pierwszy na wierzch
-app.on('second-instance', (event, commandLine, workingDirectory) => {
+app.on('second-instance', () => {
     if (mainWindow) {
         if (mainWindow.isMinimized()) mainWindow.restore();
         mainWindow.focus();
@@ -44,28 +46,64 @@ app.on('second-instance', (event, commandLine, workingDirectory) => {
 
 app.whenReady().then(createWindow);
 
+// --- SYSTEM AUTO-AKTUALIZACJI ---
+app.whenReady().then(() => {
+    // Rozpocznij sprawdzanie aktualizacji po odpaleniu okna
+    setTimeout(() => {
+        autoUpdater.checkForUpdatesAndNotify();
+    }, 2000); // 2 sekundy opóźnienia, żeby okno zdążyło się wczytać
+});
+
+autoUpdater.on('checking-for-update', () => {
+    if (mainWindow) mainWindow.webContents.send('update-message', 'Sprawdzanie dostępności aktualizacji...');
+});
+
+autoUpdater.on('update-available', (info) => {
+    if (mainWindow) mainWindow.webContents.send('update-message', 'Znaleziono nową wersję! Przygotowywanie...');
+});
+
+autoUpdater.on('update-not-available', (info) => {
+    if (mainWindow) mainWindow.webContents.send('update-message', 'Masz najnowszą wersję launchera.');
+});
+
+autoUpdater.on('error', (err) => {
+    if (mainWindow) mainWindow.webContents.send('update-message', 'System aktualizacji działa tylko na skompilowanej wersji.');
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+    let log_message = 'Pobieranie aktualizacji: ' + Math.round(progressObj.percent) + '%';
+    if (mainWindow) mainWindow.webContents.send('update-message', log_message);
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+    if (mainWindow) mainWindow.webContents.send('update-message', 'Aktualizacja pobrana! Restartowanie w 3 sekundy...');
+    setTimeout(() => {
+        autoUpdater.quitAndInstall();
+    }, 3000);
+});
+
+// --- OBSŁUGA WŁASNEGO PASKA TYTUŁOWEGO ---
+ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
+ipcMain.on('window-close', () => { if (mainWindow) mainWindow.close(); });
+
 ipcMain.on('open-mods-folder', () => {
     const modsPath = path.join(app.getPath('appData'), '.reaperclient', 'mods');
     if (!fs.existsSync(modsPath)) { fs.mkdirSync(modsPath, { recursive: true }); }
     shell.openPath(modsPath);
 });
 
-// --- LOGIKA OKNA MICROSOFT ---
 ipcMain.on('login-microsoft', async(event) => {
     try {
         const authManager = new Auth("select_account");
         const xboxManager = await authManager.launch("electron");
         const token = await xboxManager.getMinecraft();
         const mclcAuth = token.mclc();
-
         event.reply('microsoft-login-success', { nick: mclcAuth.name, auth: mclcAuth });
     } catch (err) {
-        console.error("Błąd logowania Microsoft:", err);
         event.reply('microsoft-login-error', "Logowanie zostało przerwane przez gracza lub wystąpił błąd.");
     }
 });
 
-// --- INTELIGENTNY SILNIK GŁĘBOKIEGO KOPIOWANIA PACZKI ---
 function bezpieczneKopiowanieScentralizowane(src, dest) {
     if (!fs.existsSync(src)) return;
     const stat = fs.statSync(src);
@@ -78,7 +116,6 @@ function bezpieczneKopiowanieScentralizowane(src, dest) {
         }
     } else {
         const czyPlikXaero = dest.toLowerCase().includes('xaero');
-
         if (czyPlikXaero) {
             if (!fs.existsSync(dest)) {
                 try { fs.copySync(src, dest); } catch (e) {}
@@ -89,23 +126,22 @@ function bezpieczneKopiowanieScentralizowane(src, dest) {
     }
 }
 
-// --- FUNKCJA TWORZĄCA BEZPIECZNE TUNELE (JUNCTIONS) ---
 function utworzWirtualnyFolder(glowny, profilowy) {
     fs.ensureDirSync(glowny);
     try {
-        fs.lstatSync(profilowy);
-        fs.removeSync(profilowy);
+        const stat = fs.lstatSync(profilowy);
+        if (stat.isSymbolicLink()) {
+            fs.unlinkSync(profilowy);
+        } else {
+            fs.rmSync(profilowy, { recursive: true, force: true });
+        }
     } catch (err) {}
 
     try {
         fs.symlinkSync(glowny, profilowy, 'junction');
-        console.log(`[Junction] Połączono folder: ${profilowy}`);
-    } catch (err) {
-        console.error(`Nie udało się utworzyć tunelu dla ${profilowy}:`, err);
-    }
+    } catch (err) { console.error(err); }
 }
 
-// --- GŁÓWNA LOGIKA URUCHAMIANIA GRY ---
 ipcMain.on('start-game', async(event, data) => {
     try {
         if (!data || !data.account || !data.account.nick) {
@@ -123,7 +159,6 @@ ipcMain.on('start-game', async(event, data) => {
         fs.ensureDirSync(mainDir);
         fs.ensureDirSync(profileDir);
 
-        // 1. Głębokie kopiowanie Twoich plików
         const basepath = app.isPackaged ? process.resourcesPath : __dirname;
         const extraFiles = path.join(basepath, 'DodatkowePliki');
 
@@ -131,10 +166,8 @@ ipcMain.on('start-game', async(event, data) => {
             bezpieczneKopiowanieScentralizowane(extraFiles, mainDir);
         }
 
-        // 2. Tworzenie wirtualnych folderów dla profilu
         const folderyWspoldzielone = [
-            'assets', 'libraries', 'versions', 'mods',
-            'xaero',
+            'assets', 'libraries', 'versions', 'mods', 'xaero',
             'config', 'shaderpacks', 'resourcepacks', 'defaultconfigs'
         ];
 
@@ -142,14 +175,12 @@ ipcMain.on('start-game', async(event, data) => {
             utworzWirtualnyFolder(path.join(mainDir, folder), path.join(profileDir, folder));
         }
 
-        // Kopiowanie listy serwerów
         const serversDatGlowny = path.join(mainDir, 'servers.dat');
         const serversDatProfil = path.join(profileDir, 'servers.dat');
         if (fs.existsSync(serversDatGlowny) && !fs.existsSync(serversDatProfil)) {
             try { fs.copySync(serversDatGlowny, serversDatProfil); } catch (e) {}
         }
 
-        // Ustawienia Gracza (options.txt)
         const profileOptions = path.join(profileDir, 'options.txt');
         if (!fs.existsSync(profileOptions)) {
             const oryginalnyMC = path.join(app.getPath('appData'), '.minecraft', 'options.txt');
@@ -179,10 +210,8 @@ ipcMain.on('start-game', async(event, data) => {
             } catch (err) {}
         }
 
-        // Java
         const javaPath = path.join(mainDir, 'java', 'bin', 'javaw.exe');
         if (!fs.existsSync(javaPath)) {
-            console.error("BŁĄD: Nie znaleziono Javy w ścieżce: " + javaPath);
             fs.writeFileSync(path.join(profileDir, 'launcher_log.txt'), "KRYTYCZNY BŁĄD: Brak plików Java!\n");
             event.reply('game-closed');
             return;
@@ -190,7 +219,6 @@ ipcMain.on('start-game', async(event, data) => {
 
         const screenArea = screen.getPrimaryDisplay().workAreaSize;
 
-        // Autoryzacja
         let waznaAutoryzacja;
         if (data.account.type === 'premium') {
             waznaAutoryzacja = data.account.auth;
@@ -203,49 +231,26 @@ ipcMain.on('start-game', async(event, data) => {
             authorization: waznaAutoryzacja,
             root: profileDir,
             javaPath: javaPath,
-            version: {
-                number: "1.21.5",
-                type: "release",
-                custom: "fabric-loader-0.19.2-1.21.5"
-            },
-            memory: {
-                max: `${przydzielonyRam}G`,
-                min: "2G"
-            },
-            window: {
-                width: screenArea.width,
-                height: screenArea.height
-            },
+            version: { number: "1.21.5", type: "release", custom: "fabric-loader-0.19.2-1.21.5" },
+            memory: { max: `${przydzielonyRam}G`, min: "2G" },
+            window: { width: screenArea.width, height: screenArea.height },
             detached: false
         };
 
         const logStream = fs.createWriteStream(path.join(profileDir, 'launcher_log.txt'), { flags: 'w' });
-        logStream.write(`=== START PROFILU: ${username} | RAM: ${przydzielonyRam}GB ===\n`);
 
         launcher.on('data', (e) => logStream.write("[GRA]: " + e + "\n"));
         launcher.on('progress', (e) => event.reply('file-progress', e));
         launcher.on('arguments', () => event.reply('game-started'));
-
-        launcher.on('error', (e) => {
-            logStream.write("[BŁĄD LAUNCHERA]: " + e + "\n");
-            console.error("Błąd silnika:", e);
-            event.reply('game-closed');
-        });
-
+        launcher.on('error', (e) => { event.reply('game-closed'); });
         launcher.on('close', (code) => {
-            logStream.write(`\n=== ZAMKNIĘTO GRĘ (Kod wyjścia: ${code}) ===`);
-            logStream.end();
             event.reply('game-closed');
+            logStream.end();
         });
 
-        launcher.launch(options).catch(err => {
-            logStream.write("[BŁĄD KRYTYCZNY URUCHAMIANIA]: " + err + "\n");
-            console.error("Błąd launch:", err);
-            event.reply('game-closed');
-        });
+        launcher.launch(options).catch(err => { event.reply('game-closed'); });
 
     } catch (fatalErr) {
-        console.error("KRYTYCZNY BŁĄD PROCESU:", fatalErr);
         event.reply('game-closed');
     }
 });

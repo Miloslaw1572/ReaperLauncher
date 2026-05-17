@@ -30,9 +30,15 @@
             "createStartMenuShortcut": true,
             "shortcutName": "ReaperClient",
             "uninstallDisplayName": "ReaperLauncher (Odinstaluj)"
+        },
+        "publish": {
+            "provider": "github",
+            "owner": "Miloslaw1572",
+            "repo": "ReaperLauncher"
         }
     },
     "dependencies": {
+        "electron-updater": "^6.8.3",
         "fs-extra": "^11.3.5",
         "graceful-fs": "^4.2.11",
         "minecraft-launcher-core": "^3.18.2",
