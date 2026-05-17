@@ -1,6 +1,5 @@
 name: Build and Release Launcher
 
-# Skrypt uruchomi się TYLKO wtedy, gdy klikniesz odpowiedni guzik na GitHubie
 on:
   workflow_dispatch:
 
@@ -10,17 +9,18 @@ jobs:
 
     steps:
       - name: Pobieranie kodu
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Instalacja środowiska Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Instalacja pakietów (npm install)
         run: npm install
 
       - name: Budowanie pliku .exe i publikacja!
-        run: npm run build -c.publish=github
+        # MAGIA JEST TUTAJ: Dopisek "--publish always" wymusza wrzucenie pliku do zakładki Releases
+        run: npm run build -- --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
