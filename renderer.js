@@ -1,11 +1,9 @@
-//BEZPIECZNE PRZYPISANIE GUZIKÓW PASKA TYTUŁOWEGO
 const btnMinimize = document.getElementById('btnMinimize');
 if (btnMinimize) btnMinimize.onclick = () => { window.api.send('window-minimize'); };
 
 const btnClose = document.getElementById('btnClose');
 if (btnClose) btnClose.onclick = () => { window.api.send('window-close'); };
 
-//DOM ELEMENTS
 const btnEmptyAddAccount = document.getElementById('btnEmptyAddAccount');
 const accountSelectorContainer = document.getElementById('accountSelectorContainer');
 const customSelectToggle = document.getElementById('customSelectToggle');
@@ -111,7 +109,7 @@ if (document.getElementById('modalSettingsSaveBtn')) {
 ramSlider.oninput = (e) => syncRamDisplay(e.target.value);
 ramInput.onchange = (e) => syncRamDisplay(e.target.value);
 
-//RYSOWANIE KONT
+//rysowanie kont
 function renderAccounts() {
     if (accounts.length === 0) {
         btnEmptyAddAccount.style.display = 'block';
@@ -203,7 +201,7 @@ btnEmptyAddAccount.onclick = otworzModal;
 btnPlus.onclick = otworzModal;
 modalCancelBtn.onclick = zamknijModal;
 
-//LOGOWANIE OFFLINE
+//logowanie non premium
 modalAddBtn.onclick = () => {
     const nick = modalNickInput.value.trim();
     if (nick.length < 3) {
@@ -224,7 +222,7 @@ modalAddBtn.onclick = () => {
     renderAccounts();
 };
 
-//LOGOWANIE MICROSOFT
+//logowanie premium
 btnMicrosoftLogin.onclick = () => {
     btnMicrosoftLogin.disabled = true;
     msLoginStatus.innerText = "Otwieranie bezpiecznego okna Microsoft...";
@@ -252,7 +250,7 @@ window.api.receive('microsoft-login-error', (errorMsg) => {
     msLoginStatus.style.color = "#e74c3c";
 });
 
-//USUWANIE KONT
+//usuwanie kont
 modalDeleteCancelBtn.onclick = () => {
     deleteAccountModal.style.display = 'none';
     accountToDelete = null;
@@ -269,7 +267,7 @@ modalDeleteConfirmBtn.onclick = () => {
     accountToDelete = null;
 };
 
-//LOGIKA URUCHAMIANIA GRY
+//logika uruchamiania gry
 function aktualizujPrzyciskGraj() {
     if (accounts.length === 0) {
         btnGraj.disabled = true;
@@ -311,7 +309,7 @@ btnGraj.addEventListener('click', () => {
     window.api.send('start-game', { account: selectedAccountObj, ram: finalRam });
 });
 
-//ODBIERANIE BŁĘDÓW I BLOKAD
+//odbieranie bledów
 window.api.receive('launcher-error', (msg) => {
     isLaunching = false;
     progressContainer.style.display = "none";
@@ -325,7 +323,7 @@ window.api.receive('update-state', (state) => {
     aktualizujPrzyciskGraj();
 });
 
-//ODBIERANIE POSTĘPU POBIERANIA
+//odbieranie postepu pobierania
 window.api.receive('file-progress', (data) => {
     const pobrane = data.task;
     const wszystkie = data.total;
@@ -350,7 +348,7 @@ window.api.receive('file-progress', (data) => {
     }
 });
 
-//ODBIERANIE STANU GRY
+//odbieranie stanu gry
 window.api.receive('game-started', () => {
     runningInstances++;
     progressContainer.style.display = "none";
@@ -390,7 +388,7 @@ window.api.receive('update-message', (msg) => {
     }
 });
 
-//ODBIERANIE WERSJI PAKIETU
+//odbieranie wersji
 window.api.receive('set-version', (version) => {
     const versionElement = document.getElementById('appVersionText');
     if (versionElement) {
@@ -398,6 +396,6 @@ window.api.receive('set-version', (version) => {
     }
 });
 
-//INICJALIZACJA STARTOWA
+//inicjalizacja
 window.api.send('get-version');
 renderAccounts();

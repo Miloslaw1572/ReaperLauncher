@@ -5,7 +5,18 @@
     <meta charset="UTF-8">
     <title>ReaperLauncher</title>
     <style>
-        /* ZMIANA: padding-top wypycha zawartość pod nowy pasek, box-sizing zapobiega psuciu szerokości */
+        /* blokada zaznaczania i przeciągania */
+        
+        * {
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+        /* odblokowanie dla pola tekstowego z nickiem */
+        
+        input {
+            user-select: auto;
+            -webkit-user-drag: auto;
+        }
         
         body {
             margin: 0;

@@ -10,7 +10,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const { autoUpdater } = require('electron-updater');
 
-// --- ZABEZPIECZENIE: BLOKADA WIELOKROTNEGO URUCHOMIENIA LAUNCHERA ---
+// blokada kilku launcherów na raz
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
     app.quit();
@@ -19,17 +19,16 @@ if (!gotTheLock) {
 
 let mainWindow;
 
-// --- GLOBALNE REJESTRY BLOKAD ---
 let isClientUpdating = false;
-const activeNicks = new Set(); // Przechowuje aktualnie włączone nicki graczy
+const activeNicks = new Set(); // aktualnie włączone nicki
 
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1280,
-        height: 755, // Powiększone o własny pasek
+        height: 755,
         resizable: false,
         autoHideMenuBar: true,
-        frame: false, // Brak systemowej ramki
+        frame: false,
         title: 'ReaperLauncher',
         icon: path.join(__dirname, 'reaper_logo.png'),
         webPreferences: {
@@ -49,31 +48,31 @@ app.on('second-instance', () => {
     }
 });
 
-// --- INICJALIZACJA APLIKACJI I AUTO-UPDATERA ---
+//inicjalizacja
 app.whenReady().then(() => {
     createWindow();
 
-    // Sprawdzanie aktualizacji 2 sekundy po uruchomieniu
+    //sprawdzanie aktualizacji
     setTimeout(() => {
         autoUpdater.checkForUpdatesAndNotify();
     }, 2000);
 });
 
-// --- STATUSY AUTO-AKTUALIZACJI ---
+//status autoaktualizacji
 autoUpdater.on('checking-for-update', () => {
     if (mainWindow) mainWindow.webContents.send('update-message', 'Sprawdzanie dostępności aktualizacji...');
 });
 
 autoUpdater.on('update-available', (info) => {
-    isClientUpdating = true; // BLOKADA: Aktualizacja ruszyła
+    isClientUpdating = true;
     if (mainWindow) {
         mainWindow.webContents.send('update-message', 'Znaleziono nową wersję! Przygotowywanie...');
-        mainWindow.webContents.send('update-state', true); // Wyłączamy guzik w UI
+        mainWindow.webContents.send('update-state', true);
     }
 });
 
 autoUpdater.on('update-not-available', (info) => {
-    isClientUpdating = false; // ODBLOKOWANIE
+    isClientUpdating = false;
     if (mainWindow) {
         mainWindow.webContents.send('update-message', `Masz najnowszą wersję launchera.`);
         mainWindow.webContents.send('update-state', false);
@@ -81,7 +80,7 @@ autoUpdater.on('update-not-available', (info) => {
 });
 
 autoUpdater.on('error', (err) => {
-    isClientUpdating = false; // ODBLOKOWANIE
+    isClientUpdating = false;
     if (mainWindow) {
         mainWindow.webContents.send('update-message', 'System aktualizacji działa tylko na skompilowanej wersji.');
         mainWindow.webContents.send('update-state', false);
@@ -97,15 +96,14 @@ autoUpdater.on('download-progress', (progressObj) => {
 autoUpdater.on('update-downloaded', (info) => {
     if (mainWindow) mainWindow.webContents.send('update-message', 'Aktualizacja pobrana! Cicha instalacja...');
     setTimeout(() => {
-        autoUpdater.quitAndInstall(true, true); // (true, true) = Instalacja w tle i automatyczny restart
+        autoUpdater.quitAndInstall(true, true);
     }, 3000);
 });
 
-// --- OBSŁUGA WŁASNEGO PASKA TYTUŁOWEGO ---
+//obsluga paska tytulowego
 ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.on('window-close', () => { if (mainWindow) mainWindow.close(); });
 
-// --- INNE AKCJE INTERFEJSU ---
 ipcMain.on('open-mods-folder', () => {
     const modsPath = path.join(app.getPath('appData'), '.reaperclient', 'mods');
     if (!fs.existsSync(modsPath)) { fs.mkdirSync(modsPath, { recursive: true }); }
@@ -124,7 +122,7 @@ ipcMain.on('login-microsoft', async(event) => {
     }
 });
 
-// --- INTELIGENTNE KOPIOWANIE ---
+//kopiowanie plikow
 function bezpieczneKopiowanieScentralizowane(src, dest) {
     if (!fs.existsSync(src)) return;
     const stat = fs.statSync(src);
@@ -163,7 +161,7 @@ function utworzWirtualnyFolder(glowny, profilowy) {
     } catch (err) { console.error(err); }
 }
 
-// --- GŁÓWNA LOGIKA URUCHAMIANIA GRY ---
+//uruchamianie gry
 ipcMain.on('start-game', async(event, data) => {
     try {
         if (!data || !data.account || !data.account.nick) {
@@ -174,13 +172,13 @@ ipcMain.on('start-game', async(event, data) => {
         const username = String(data.account.nick).trim();
         const przydzielonyRam = data.ram;
 
-        // 1. BLOKADA: Sprawdzanie czy trwa aktualizacja klienta
+        //sprawdzanie czy aktualizacja trwa
         if (isClientUpdating) {
             event.reply('launcher-error', 'Nie można uruchomić gry! Trwa aktualizacja launchera.');
             return;
         }
 
-        // 2. BLOKADA: Sprawdzanie czy ten nick już gra
+        //sprawdzanie czy dany nick jest w grze
         if (activeNicks.has(username)) {
             event.reply('launcher-error', `Konto "${username}" jest już uruchomione!`);
             return;
@@ -274,7 +272,7 @@ ipcMain.on('start-game', async(event, data) => {
             detached: false
         };
 
-        // --- REJESTRATOR BŁĘDÓW (X-RAY DEBUG LOG) ---
+        //rejestrator bledow
         const logStream = fs.createWriteStream(path.join(profileDir, 'launcher_log.txt'), { flags: 'w' });
         logStream.write(`=== START PROFILU: ${username} | WERSJA LAUNCHERA: ${app.getVersion()} ===\n`);
 

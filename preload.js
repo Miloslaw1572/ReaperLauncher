@@ -9,7 +9,6 @@ contextBridge.exposeInMainWorld('api', {
         }
     },
     receive: (channel, func) => {
-        // ZMIANA: Dodano 'update-state' oraz 'launcher-error'
         const validChannels = ['microsoft-login-success', 'microsoft-login-error', 'file-progress', 'game-started', 'game-closed', 'update-message', 'set-version', 'update-state', 'launcher-error'];
         if (validChannels.includes(channel)) {
             ipcRenderer.on(channel, (event, ...args) => func(...args));
