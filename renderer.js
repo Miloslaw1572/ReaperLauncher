@@ -111,13 +111,19 @@ ramInput.onchange = (e) => syncRamDisplay(e.target.value);
 
 //rysowanie kont
 function renderAccounts() {
+    const mainPanelTitle = document.getElementById('mainPanelTitle');
+
     if (accounts.length === 0) {
+        if (mainPanelTitle) mainPanelTitle.innerText = "";
+
         btnEmptyAddAccount.style.display = 'block';
         accountSelectorContainer.style.display = 'none';
         selectedAccountNick = null;
         aktualizujPrzyciskGraj();
         return;
     }
+
+    if (mainPanelTitle) mainPanelTitle.innerText = "Wybierz konto";
 
     btnEmptyAddAccount.style.display = 'none';
     accountSelectorContainer.style.display = 'flex';
