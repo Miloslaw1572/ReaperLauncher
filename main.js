@@ -1,4 +1,3 @@
-// --- ZABEZPIECZENIE PRZED BŁĘDAMI DOSTĘPU DO PLIKÓW (EMFILE) ---
 const realFs = require('fs');
 const gracefulFs = require('graceful-fs');
 gracefulFs.gracefulify(realFs);
@@ -110,6 +109,31 @@ ipcMain.on('open-mods-folder', () => {
     shell.openPath(modsPath);
 });
 
+// --- ZARZĄDZANIE MODAMI GRACZA ---
+ipcMain.on('open-user-mods-folder', () => {
+    const uModsPath = path.join(app.getPath('appData'), '.reaperclient', 'user-mods');
+    fs.ensureDirSync(uModsPath);
+    shell.openPath(uModsPath);
+});
+
+// Pobieracz plików z bazy Modrinth
+ipcMain.on('download-modrinth', async(event, { url, filename }) => {
+    try {
+        const uModsPath = path.join(app.getPath('appData'), '.reaperclient', 'user-mods');
+        fs.ensureDirSync(uModsPath);
+        const dest = path.join(uModsPath, filename);
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Błąd sieci: ${response.status}`);
+        const buffer = await response.arrayBuffer();
+        fs.writeFileSync(dest, Buffer.from(buffer));
+
+        event.reply('mod-download-done', filename);
+    } catch (err) {
+        event.reply('mod-download-error', err.message);
+    }
+});
+
 ipcMain.on('login-microsoft', async(event) => {
     try {
         const authManager = new Auth("select_account");
@@ -199,6 +223,20 @@ ipcMain.on('start-game', async(event, data) => {
         if (fs.existsSync(extraFiles)) {
             bezpieczneKopiowanieScentralizowane(extraFiles, mainDir);
         }
+
+        // --- SYNCHRONIZACJA MODÓW (SERWER + GRACZ) ---
+        const baseModsPath = path.join(extraFiles, 'mods');
+        const finalModsPath = path.join(mainDir, 'mods');
+        const userModsPath = path.join(mainDir, 'user-mods');
+
+        fs.ensureDirSync(finalModsPath);
+        fs.ensureDirSync(userModsPath);
+
+        fs.emptyDirSync(finalModsPath);
+        if (fs.existsSync(baseModsPath)) {
+            fs.copySync(baseModsPath, finalModsPath);
+        }
+        fs.copySync(userModsPath, finalModsPath, { overwrite: true });
 
         const folderyWspoldzielone = [
             'assets', 'libraries', 'versions', 'mods', 'xaero',
@@ -311,7 +349,20 @@ ipcMain.on('start-game', async(event, data) => {
     }
 });
 
-// --- OBSŁUGA WERSJI NA ŻĄDANIE UI ---
 ipcMain.on('get-version', (event) => {
     event.reply('set-version', app.getVersion());
+});
+
+ipcMain.on('get-installed-mods', (event) => {
+    let installed = [];
+    const userModsPath = path.join(app.getPath('appData'), '.reaperclient', 'user-mods');
+    const mainModsPath = path.join(app.getPath('appData'), '.reaperclient', 'mods');
+    const basepath = app.isPackaged ? process.resourcesPath : __dirname;
+    const extraMods = path.join(basepath, 'DodatkowePliki', 'mods');
+
+    try { if (fs.existsSync(userModsPath)) installed.push(...fs.readdirSync(userModsPath)); } catch (e) {}
+    try { if (fs.existsSync(mainModsPath)) installed.push(...fs.readdirSync(mainModsPath)); } catch (e) {}
+    try { if (fs.existsSync(extraMods)) installed.push(...fs.readdirSync(extraMods)); } catch (e) {}
+
+    event.reply('installed-mods-list', [...new Set(installed)].map(f => f.toLowerCase()));
 });

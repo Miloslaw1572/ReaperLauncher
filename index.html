@@ -243,7 +243,7 @@
         #btnPlus {
             width: 45px;
             height: 45px;
-            background-color: #27ae60;
+            background-color: #f1c40f;
             color: white;
             border: none;
             border-radius: 5px;
@@ -257,7 +257,7 @@
         }
         
         #btnPlus:hover {
-            background-color: #2ecc71;
+            background-color: #d39e00;
         }
         
         .custom-dropdown {
@@ -383,11 +383,11 @@
         }
         
         .btn-modal-add {
-            background-color: #27ae60;
+            background-color: #f1c40f;
         }
         
         .btn-modal-add:hover {
-            background-color: #2ecc71;
+            background-color: #d39e00;
         }
         
         .btn-modal-delete {
@@ -615,7 +615,7 @@
             <h3>Dodaj Konto</h3>
             <p id="modalError">Błąd</p>
             <div style="margin-bottom: 15px;">
-                <p style="color: #ccc; font-size: 13px; margin-bottom: 10px;">Konto Premium (Zalecane):</p>
+                <p style="color: #ccc; font-size: 13px; margin-bottom: 10px;">Konto Premium:</p>
                 <button id="btnMicrosoftLogin" class="btn-modal btn-modal-ms">
                     Zaloguj przez Microsoft
                     <img src="ms_logo.png" alt="MS Logo" class="ms-logo-icon">
@@ -624,9 +624,9 @@
             </div>
             <div class="divider"></div>
             <div style="margin-top: 15px;">
-                <p style="color: #ccc; font-size: 13px; margin-bottom: 10px;">Konto Offline (Brak dostępu do serwerów Premium):</p>
-                <input type="text" id="modalNickInput" placeholder="Wpisz dowolny nick" autocomplete="off">
-                <button id="modalAddBtn" class="btn-modal btn-modal-add" style="width: 100%;">Dodaj Offline</button>
+                <p style="color: #ccc; font-size: 13px; margin-bottom: 10px;">Konto Non-premium:</p>
+                <input type="text" id="modalNickInput" placeholder="Wpisz swój nick" autocomplete="off">
+                <button id="modalAddBtn" class="btn-modal btn-modal-add" style="width: 100%;">Dodaj konto</button>
             </div>
             <div class="modal-buttons" style="margin-top: 20px;">
                 <button id="modalCancelBtn" class="btn-modal btn-modal-cancel">Zamknij okno</button>
@@ -657,6 +657,58 @@
                 <button id="modalSettingsCancelBtn" class="btn-modal btn-modal-cancel">Anuluj</button>
                 <button id="modalSettingsSaveBtn" class="btn-modal btn-modal-add">Zapisz</button>
             </div>
+        </div>
+    </div>
+
+    <style>
+        /* STYLIZACJA SCROLLBARA W LIŚCIE MODÓW */
+        
+        #modrinthResults::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        #modrinthResults::-webkit-scrollbar-track {
+            background: #1a1a1a;
+            border-radius: 4px;
+        }
+        
+        #modrinthResults::-webkit-scrollbar-thumb {
+            background: #f1c40f;
+            border-radius: 4px;
+        }
+        
+        #modrinthResults::-webkit-scrollbar-thumb:hover {
+            background: #d39e00;
+        }
+    </style>
+
+    <div id="modChoiceModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: #111; padding: 30px; border-radius: 15px; border: 1px solid #f1c40f; text-align: center; width: 400px;">
+            <h3 style="color: #f1c40f; margin-top: 0;">Zarządzanie modami</h3>
+            <button id="btnActionOpenFolder" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Otwórz folder (user-mods)</button>
+            <button id="btnActionModrinth" style="width: 100%; padding: 12px; margin-bottom: 20px; background: #f1c40f; color: #111; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Dodaj z biblioteki Modrinth</button>
+            <button id="btnActionCancelChoice" style="width: 100%; padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer;">Anuluj</button>
+        </div>
+    </div>
+
+    <div id="modrinthModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1001; justify-content: center; align-items: center;">
+        <div style="background: #111; padding: 20px; border-radius: 15px; border: 1px solid #f1c40f; width: 650px; height: 550px; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="color: #f1c40f; margin: 0;">Modrinth (Fabric 1.21.5)</h2>
+                <button id="btnCloseModrinth" style="background: transparent; color: white; border: none; font-size: 20px; cursor: pointer;">✖</button>
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <input type="text" id="modrinthSearchInput" placeholder="Szukaj modów" style="flex-grow: 1; padding: 10px; background: #222; border: 1px solid #444; color: white; border-radius: 5px; outline: none;">
+                <button id="btnSearchModrinth" style="padding: 10px 20px; background: #f1c40f; color: #111; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Szukaj</button>
+            </div>
+            <div id="modrinthResults" style="flex-grow: 1; overflow-y: auto; background: #1a1a1a; border-radius: 5px; padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #333;">
+                <button id="btnModrinthPrev" style="padding: 8px 15px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer;">◄ Poprzednia</button>
+                <span id="modrinthPageLabel" style="color: #ccc; font-weight: bold;">Strona 1</span>
+                <button id="btnModrinthNext" style="padding: 8px 15px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer;">Następna ►</button>
+            </div>
+            <p id="modrinthStatus" style="color: #f1c40f; margin: 10px 0 0 0; text-align: center; font-size: 14px; min-height: 20px;"></p>
         </div>
     </div>
 
