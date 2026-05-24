@@ -224,7 +224,7 @@ ipcMain.on('start-game', async(event, data) => {
             bezpieczneKopiowanieScentralizowane(extraFiles, mainDir);
         }
 
-        // --- SYNCHRONIZACJA MODÓW (SERWER + GRACZ) ---
+        // --- BEZPIECZNA SYNCHRONIZACJA MODÓW (SERWER + GRACZ) ---
         const baseModsPath = path.join(extraFiles, 'mods');
         const finalModsPath = path.join(mainDir, 'mods');
         const userModsPath = path.join(mainDir, 'user-mods');
@@ -232,11 +232,20 @@ ipcMain.on('start-game', async(event, data) => {
         fs.ensureDirSync(finalModsPath);
         fs.ensureDirSync(userModsPath);
 
-        fs.emptyDirSync(finalModsPath);
-        if (fs.existsSync(baseModsPath)) {
-            fs.copySync(baseModsPath, finalModsPath);
+        // Używamy try..catch, żeby Windows nie scrashował launchera przy zablokowanym pliku
+        try {
+            fs.emptyDirSync(finalModsPath);
+        } catch (err) {
+            console.log("Ignorowanie zablokowanych plików w mods...");
         }
-        fs.copySync(userModsPath, finalModsPath, { overwrite: true });
+
+        if (fs.existsSync(baseModsPath)) {
+            try { fs.copySync(baseModsPath, finalModsPath, { overwrite: true }); } catch (e) {}
+        }
+
+        try {
+            fs.copySync(userModsPath, finalModsPath, { overwrite: true });
+        } catch (e) {}
 
         const folderyWspoldzielone = [
             'assets', 'libraries', 'versions', 'mods', 'xaero',
@@ -345,7 +354,10 @@ ipcMain.on('start-game', async(event, data) => {
 
     } catch (fatalErr) {
         if (data && data.account && data.account.nick) activeNicks.delete(String(data.account.nick).trim());
-        event.reply('game-closed');
+        console.error("KRYTYCZNY BŁĄD PROCESU:", fatalErr);
+
+        // ZMIANA: Zamiast cicho zamykać, wywalamy błąd na ekran na czerwono!
+        event.reply('launcher-error', `Krytyczny błąd launchera: ${fatalErr.message}`);
     }
 });
 
